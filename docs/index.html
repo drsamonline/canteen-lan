@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canteen — order from your table over the LAN</title>
+<meta name="description" content="Order from your table over the room's own Wi-Fi. Guests order from their seat; the kitchen sees every table live — no accounts, no internet, no telemetry.">
+<meta property="og:title" content="Canteen — order from your table over the LAN">
+<meta property="og:description" content="Order from your seat, live, over your own Wi-Fi.">
+<style>
+  :root{--bg:#0f1115;--card:#171a21;--ink:#e7e9ee;--mut:#9aa3b2;--line:#252a34;--acc:#22c55e}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  main{max-width:760px;margin:0 auto;padding:32px 20px 60px}
+  h1{font-size:34px;margin:0 0 6px}
+  h2{font-size:17px;margin:34px 0 8px}
+  .mut{color:var(--mut)}
+  .cta{display:inline-block;background:var(--acc);color:#06210f;text-decoration:none;font-weight:700;border-radius:11px;padding:12px 18px;margin:16px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .card b{display:block;margin-bottom:3px}
+  code{background:#0d1014;padding:2px 6px;border-radius:6px}
+  footer{color:var(--mut);font-size:13px;margin-top:40px;border-top:1px solid var(--line);padding-top:16px}
+  a{color:var(--acc)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Canteen</h1>
+  <p class="mut">Order from your table over the room's own Wi-Fi. Guests tap a menu
+  and send an order from their seat; the kitchen sees every table live. No accounts,
+  no internet, no telemetry — the orders never leave your network.</p>
+  <a class="cta" href="./play/">Open the board &rarr;</a>
+
+  <h2>What you get</h2>
+  <div class="grid">
+    <div class="card"><b>Order from the seat</b><span class="mut">A menu, a cart and a note — sent to the kitchen in a tap.</span></div>
+    <div class="card"><b>One kitchen view</b><span class="mut">Every open order grouped by table, live.</span></div>
+    <div class="card"><b>Per-table bill</b><span class="mut">A running total for each table, updated as orders land.</span></div>
+    <div class="card"><b>Call &amp; bill</b><span class="mut">Call the waiter or ask for the bill; the kitchen acknowledges.</span></div>
+    <div class="card"><b>Works offline</b><span class="mut">Runs on a Wi-Fi network with the internet unplugged.</span></div>
+    <div class="card"><b>EN / हिन्दी / ગુજરાતી</b><span class="mut">Language and light/dark, remembered. CSV export for the shift.</span></div>
+  </div>
+
+  <h2>How it works</h2>
+  <p class="mut">One machine starts a room host (<code>node host/room.js</code>), seeds
+  the menu and prints its LAN address. Each device opens this board, pastes the
+  address and taps <b>Join room</b>. Orders and status changes travel over the local
+  network — Server-Sent Events one way, plain POST the other — with no framework, no
+  server to sign into and nothing to install. Prices come from the room's menu, never
+  from the message, so a table can't mis-price an order. A late joiner is caught up
+  from the host's history automatically.</p>
+
+  <footer>
+    Built with <a href="https://github.com/drsamonline/forge">Forge</a> on the shared
+    <a href="https://drsamonline.github.io/web-kit/">web-kit</a> and
+    <a href="https://drsamonline.github.io/lan-kit/">lan-kit</a>. MIT. © 2026 Dr Sohil Momin.
+  </footer>
+</main>
+</body>
+</html>
