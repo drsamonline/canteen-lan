@@ -1,0 +1,18 @@
+name: Build portable EXE + Android APK
+
+# Uses the shared, reusable build workflow from the public app-builder kit.
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    uses: drsamonline/app-builder/.github/workflows/build.yml@main
+    with:
+      app_name: canteen-lan
+      app_src: docs/play
