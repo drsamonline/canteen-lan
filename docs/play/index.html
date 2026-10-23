@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canteen — order from your table</title>
+<meta name="description" content="Order from your table over the room's own Wi-Fi. No accounts, no internet, no telemetry.">
+<meta name="theme-color" content="#0f1115">
+<style>
+  :root{--bg:#0f1115;--card:#171a21;--ink:#e7e9ee;--mut:#9aa3b2;--line:#252a34;--acc:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  header,main,footer{max-width:900px;margin:0 auto;padding:16px 20px}
+  header{border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+  h1{font-size:20px;margin:0}
+  h1 span{color:var(--mut);font-weight:400;font-size:14px}
+  h2{font-size:15px;margin:22px 0 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .grow{flex:1}
+  button,select,input,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+  button{cursor:pointer}
+  button.primary{background:var(--acc);color:#06210f;border-color:var(--acc);font-weight:700}
+  button.sm{padding:5px 9px;font-size:13px}
+  button.ghost{background:transparent}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+  .item{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .item b{font-weight:600;font-size:14px}
+  .item small{color:var(--mut)}
+  .qty{display:flex;align-items:center;gap:6px}
+  .qty button{width:30px;text-align:center;padding:4px 0}
+  .mut{color:var(--mut)}
+  .pill{display:inline-block;font-size:12px;border-radius:999px;padding:2px 9px;border:1px solid var(--line)}
+  .s-placed{color:var(--warn);border-color:var(--warn)}
+  .s-preparing{color:#38bdf8;border-color:#38bdf8}
+  .s-served{color:var(--acc);border-color:var(--acc)}
+  .s-cancelled{color:var(--bad);border-color:var(--bad);text-decoration:line-through}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--mut);display:inline-block}
+  .dot.on{background:var(--acc)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+  .stats .card b{display:block;font-size:22px}
+  .line{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px dashed var(--line)}
+  .line:last-child{border-bottom:0}
+  .table-h{display:flex;justify-content:space-between;align-items:center;margin:16px 0 6px}
+  .order{border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0}
+  .order .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .empty{color:var(--mut);font-style:italic}
+  footer{color:var(--mut);font-size:13px;border-top:1px solid var(--line);margin-top:30px}
+  [hidden]{display:none!important}
+  label{font-size:13px;color:var(--mut);display:block;margin-bottom:3px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Canteen <span id="tag"></span></h1>
+  <div class="row">
+    <span id="status" class="mut"><span class="dot"></span> <span id="statusText"></span></span>
+    <select id="lang" aria-label="Language"></select>
+    <button id="theme" class="ghost sm" title="Theme">◐</button>
+    <button id="viewBtn" class="sm">Kitchen</button>
+  </div>
+</header>
+
+<main>
+  <section id="join">
+    <h2 id="joinH"></h2>
+    <div class="card">
+      <div class="row">
+        <div class="grow"><label id="lName"></label><input id="name" placeholder="Aarti"></div>
+        <div style="width:110px"><label id="lTable"></label><input id="table" placeholder="12"></div>
+      </div>
+      <div style="margin-top:10px"><label id="lHost"></label><input id="host" placeholder="http://192.168.1.20:8080"></div>
+      <div class="row" style="margin-top:12px">
+        <button id="joinBtn" class="primary"></button>
+        <span id="joinMsg" class="mut"></span>
+      </div>
+    </div>
+  </section>
+
+  <section id="app" hidden>
+    <div id="guest">
+      <h2 id="hMenu"></h2>
+      <div id="menu" class="grid"></div>
+
+      <h2 id="hCart"></h2>
+      <div class="card">
+        <div id="cart"></div>
+        <div class="row" style="margin-top:10px">
+          <input id="note" class="grow" placeholder="">
+          <button id="placeBtn" class="primary"></button>
+        </div>
+      </div>
+
+      <h2 id="hMine"></h2>
+      <div id="mine"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="waiterBtn"></button>
+        <button id="billBtn"></button>
+      </div>
+    </div>
+
+    <div id="kitchen" hidden>
+      <h2 id="hKitchen"></h2>
+      <div id="kstats" class="stats"></div>
+      <div class="row" style="margin-top:14px">
+        <button id="tabOrders" class="primary sm"></button>
+        <button id="tabCalls" class="ghost sm"></button>
+        <span class="grow"></span>
+        <button id="exportBtn" class="sm"></button>
+        <button id="clearBtn" class="sm"></button>
+      </div>
+      <div id="korders" style="margin-top:6px"></div>
+      <div id="kcalls" style="margin-top:6px" hidden></div>
+    </div>
+  </section>
+</main>
+
+<footer class="mut">
+  Built with Forge · web-kit + lan-kit · offline, no accounts · © 2026 Dr Sohil Momin
+</footer>
+
+<script src="web-kit.js"></script>
+<script src="lan-kit.js"></script>
+<script src="canteen.js"></script>
+<script>
+(function () {
+  "use strict";
+  var C = Canteen, L = Loom;
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ---- app strings, on top of web-kit's built-ins ---- */
+  var S = {
+    en: { tag: "order from your table", join: "Join room", name: "Your name", table: "Table",
+          host: "Host address (printed by the room host)", menu: "Menu", cart: "Your order",
+          note: "Note (optional, e.g. less spicy)", place: "Place order", yourtable: "At your table",
+          waiter: "Call waiter", bill: "Request bill", kitchen: "Kitchen", guest: "Order",
+          orders: "Orders", calls: "Calls", clear: "Clear served", export: "Export CSV",
+          placed: "Placed", preparing: "Preparing", served: "Served", cancelled: "Cancelled",
+          done: "Done", total: "Total", empty: "Nothing yet.", preview: "Not joined — preview menu.",
+          connected: "Connected", connecting: "Connecting…", off: "Not connected",
+          revenue: "Revenue", open: "Open", tables: "Tables", waiterCall: "Waiter called", billCall: "Bill requested",
+          prep: "Preparing", serve: "Served", cancel: "Cancel", items: "Items" },
+    hi: { tag: "अपनी मेज़ से ऑर्डर करें", join: "कमरे में जुड़ें", name: "आपका नाम", table: "मेज़",
+          host: "होस्ट पता (रूम होस्ट द्वारा दिखाया गया)", menu: "मेन्यू", cart: "आपका ऑर्डर",
+          note: "टिप्पणी (वैकल्पिक)", place: "ऑर्डर दें", yourtable: "आपकी मेज़ पर",
+          waiter: "वेटर बुलाएँ", bill: "बिल माँगें", kitchen: "रसोई", guest: "ऑर्डर",
+          orders: "ऑर्डर", calls: "कॉल", clear: "परोसे हुए हटाएँ", export: "CSV निर्यात करें",
+          placed: "दिया गया", preparing: "बन रहा है", served: "परोसा गया", cancelled: "रद्द",
+          done: "हो गया", total: "कुल", empty: "अभी कुछ नहीं।", preview: "जुड़े नहीं — पूर्वावलोकन मेन्यू।",
+          connected: "जुड़ गया", connecting: "जुड़ रहा है…", off: "जुड़ा नहीं",
+          revenue: "कुल बिक्री", open: "बाकी", tables: "मेज़ें", waiterCall: "वेटर बुलाया", billCall: "बिल माँगा",
+          prep: "बनाएँ", serve: "परोसें", cancel: "रद्द करें", items: "वस्तुएँ" },
+    gu: { tag: "તમારા ટેબલથી ઓર્ડર કરો", join: "રૂમમાં જોડાઓ", name: "તમારું નામ", table: "ટેબલ",
+          host: "હોસ્ટ સરનામું (રૂમ હોસ્ટ દ્વારા બતાવેલ)", menu: "મેનૂ", cart: "તમારો ઓર્ડર",
+          note: "નોંધ (વૈકલ્પિક)", place: "ઓર્ડર કરો", yourtable: "તમારા ટેબલ પર",
+          waiter: "વેઈટર બોલાવો", bill: "બિલ માંગો", kitchen: "રસોઈ", guest: "ઓર્ડર",
+          orders: "ઓર્ડર", calls: "કૉલ", clear: "પરોસેલા હટાવો", export: "CSV નિકાસ કરો",
+          placed: "આપેલ", preparing: "તૈયાર થાય છે", served: "પરોસ્યું", cancelled: "રદ",
+          done: "થઈ ગયું", total: "કુલ", empty: "હજી કંઈ નથી.", preview: "જોડાયા નથી — પૂર્વાવલોકન મેનૂ.",
+          connected: "જોડાયું", connecting: "જોડાઈ રહ્યું છે…", off: "જોડાયું નથી",
+          revenue: "કુલ વેચાણ", open: "બાકી", tables: "ટેબલ", waiterCall: "વેઈટર બોલાવ્યો", billCall: "બિલ માંગ્યું",
+          prep: "તૈયાર કરો", serve: "પરોસો", cancel: "રદ કરો", items: "વસ્તુઓ" }
+  };
+  ["en", "hi", "gu"].forEach(function (l) { L.i18n.extend(l, S[l]); });
+  function t(k) { return L.i18n.t(k); }
+
+  /* ---- state ---- */
+  var doc = C.newDoc();            /* the live board, rebuilt from the room's messages */
+  var joined = false, kitchen = false, tab = "orders", status = "off";
+  var cart = {};                    /* sku -> qty */
+  var me = L.storage.get("canteen:me", {});
+  var client = null;
+
+  /* ---- boot ---- */
+  L.theme.apply();
+  L.seo.title("Canteen — order from your table");
+  L.seo.description("Order from your table over the room's own Wi-Fi.");
+  var langSel = $("lang");
+  L.i18n.langs().forEach(function (l) { langSel.appendChild(L.ui.el("option", { value: l, text: l.toUpperCase() })); });
+  langSel.value = L.i18n.lang;
+  langSel.addEventListener("change", function () { L.i18n.setLang(langSel.value); label(); render(); });
+
+  $("name").value = me.name || "";
+  $("table").value = me.table || "";
+  $("host").value = me.host || Lan.hostUrl(8080);
+
+  $("theme").addEventListener("click", function () { L.theme.toggle(); });
+  $("viewBtn").addEventListener("click", function () { kitchen = !kitchen; render(); });
+  $("joinBtn").addEventListener("click", join);
+  $("placeBtn").addEventListener("click", placeOrder);
+  $("waiterBtn").addEventListener("click", function () { call("waiter"); });
+  $("billBtn").addEventListener("click", function () { call("bill"); });
+  $("tabOrders").addEventListener("click", function () { tab = "orders"; render(); });
+  $("tabCalls").addEventListener("click", function () { tab = "calls"; render(); });
+  $("clearBtn").addEventListener("click", function () { send({ t: "clear" }); });
+  $("exportBtn").addEventListener("click", exportCSV);
+
+  function label() {
+    $("tag").textContent = t("tag");
+    $("joinH").textContent = t("join");
+    $("lName").textContent = t("name"); $("lTable").textContent = t("table"); $("lHost").textContent = t("host");
+    $("joinBtn").textContent = t("join");
+    $("hMenu").textContent = t("menu"); $("hCart").textContent = t("cart"); $("hMine").textContent = t("yourtable");
+    $("note").placeholder = t("note"); $("placeBtn").textContent = t("place");
+    $("waiterBtn").textContent = t("waiter"); $("billBtn").textContent = t("bill");
+    $("viewBtn").textContent = kitchen ? t("guest") : t("kitchen");
+    $("hKitchen").textContent = t("kitchen");
+    $("tabOrders").textContent = t("orders"); $("tabCalls").textContent = t("calls");
+    $("clearBtn").textContent = t("clear"); $("exportBtn").textContent = t("export");
+  }
+
+  /* ---- the room connection ---- */
+  function join() {
+    var name = $("name").value.trim(), table = $("table").value.trim(), host = $("host").value.trim();
+    if (!host) { $("joinMsg").textContent = t("host"); return; }
+    me = { name: name, table: table, host: host };
+    L.storage.set("canteen:me", me);
+    $("joinMsg").textContent = t("connecting");
+    status = "connecting"; paintStatus();
+    try { if (client) client.close(); } catch (e) {}
+    client = Lan.client({
+      url: host,
+      onOpen: function () { joined = true; status = "on"; $("app").hidden = false; $("join").hidden = true; paintStatus(); render(); },
+      onMessage: function (m) { C.apply(doc, m); render(); },
+      onError: function () { status = "off"; paintStatus(); }
+    });
+  }
+
+  function send(msg) { if (client) client.send(msg).catch(function () {}); }
+
+  function paintStatus() {
+    var d = $("status").firstChild;
+    d.className = "dot" + (status === "on" ? " on" : "");
+    $("statusText").textContent = status === "on" ? t("connected") : (status === "connecting" ? t("connecting") : t("off"));
+  }
+
+  function placeOrder() {
+    var items = Object.keys(cart).filter(function (k) { return cart[k] > 0; })
+      .map(function (k) { return { sku: k, qty: cart[k] }; });
+    if (!items.length) return;
+    send({ t: "order", id: C.newId(), table: me.table || "?", by: me.name || "guest",
+           note: $("note").value.trim(), items: items, ts: Date.now() });
+    cart = {}; $("note").value = ""; render();
+  }
+
+  function call(kind) { send({ t: "call", table: me.table || "?", kind: kind }); }
+
+  function exportCSV() {
+    var rows = doc.orders.map(C.orderToRow);
+    if (!rows.length) return;
+    L.csv.download("canteen-orders.csv", L.csv.toCSV(rows));
+  }
+
+  /* ---- rendering ---- */
+  function statusPill(s) { return '<span class="pill s-' + s + '">' + t(s) + "</span>"; }
+
+  function render() {
+    label();
+    $("app").hidden = !joined;
+    $("join").hidden = joined;
+    $("guest").hidden = kitchen;
+    $("kitchen").hidden = !kitchen;
+    if (!joined) return;
+
+    /* menu + cart (guest) */
+    var menu = doc.menu.length ? doc.menu : C.defaultMenu();
+    var mEl = $("menu"); mEl.innerHTML = "";
+    menu.forEach(function (it) {
+      var q = cart[it.sku] || 0;
+      var card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = '<div class="item"><div><b>' + esc(it.name) + "</b><br><small>" + C.money(it.price) + "</small></div>" +
+        '<div class="qty"><button data-m="-1">&minus;</button><span>' + q + '</span><button data-m="1">+</button></div></div>';
+      card.querySelectorAll("button").forEach(function (b) {
+        b.addEventListener("click", function () {
+          cart[it.sku] = Math.max(0, Math.min(C.MAX_QTY, (cart[it.sku] || 0) + parseInt(b.getAttribute("data-m"), 10)));
+          render();
+        });
+      });
+      mEl.appendChild(card);
+    });
+
+    /* cart */
+    var cEl = $("cart"); cEl.innerHTML = "";
+    var lines = Object.keys(cart).filter(function (k) { return cart[k] > 0; });
+    if (!lines.length) { cEl.innerHTML = '<div class="empty">' + t("empty") + "</div>"; }
+    else {
+      var total = 0;
+      lines.forEach(function (k) {
+        var it = C.menuItem({ menu: menu }, k); if (!it) return;
+        total += it.price * cart[k];
+        cEl.insertAdjacentHTML("beforeend", '<div class="line"><span>' + esc(it.name) + " &times; " + cart[k] +
+          "</span><span>" + C.money(it.price * cart[k]) + "</span></div>");
+      });
+      cEl.insertAdjacentHTML("beforeend", '<div class="line"><b>' + t("total") + "</b><b>" + C.money(total) + "</b></div>");
+    }
+
+    /* my table */
+    var mine = C.ordersForTable(doc, me.table || "?");
+    var mineEl = $("mine"); mineEl.innerHTML = "";
+    if (!mine.length) mineEl.innerHTML = '<div class="card empty">' + t("empty") + "</div>";
+    else mine.slice().reverse().forEach(function (o) { mineEl.appendChild(orderCard(o, false)); });
+    var calls = C.callsForTable(doc, me.table || "?");
+    if (calls.length) mineEl.insertAdjacentHTML("afterbegin",
+      '<div class="card mut">' + calls.map(function (c) { return t(c.kind === "bill" ? "billCall" : "waiterCall"); }).join(" · ") + "</div>");
+
+    /* kitchen */
+    var st = C.stats(doc);
+    $("kstats").innerHTML =
+      stat(t("open"), st.open) + stat(t("tables"), st.tables) + stat(t("items"), st.items) + stat(t("revenue"), C.money(st.revenue));
+
+    $("tabOrders").className = (tab === "orders" ? "primary " : "ghost ") + "sm";
+    $("tabCalls").className = (tab === "calls" ? "primary " : "ghost ") + "sm";
+    $("korders").hidden = tab !== "orders";
+    $("kcalls").hidden = tab !== "calls";
+
+    var kEl = $("korders"); kEl.innerHTML = "";
+    if (!doc.orders.length) kEl.innerHTML = '<div class="card empty">' + t("empty") + "</div>";
+    else {
+      var byTable = {};
+      doc.orders.forEach(function (o) { (byTable[o.table] = byTable[o.table] || []).push(o); });
+      Object.keys(byTable).sort().forEach(function (tb) {
+        var tot = C.tableTotals(doc)[tb] || 0;
+        kEl.insertAdjacentHTML("beforeend", '<div class="table-h"><b>' + t("table") + " " + esc(tb) +
+          '</b><span class="mut">' + C.money(tot) + "</span></div>");
+        byTable[tb].forEach(function (o) { kEl.appendChild(orderCard(o, true)); });
+      });
+    }
+
+    var cEl2 = $("kcalls"); cEl2.innerHTML = "";
+    if (!doc.calls.length) cEl2.innerHTML = '<div class="card empty">' + t("empty") + "</div>";
+    else doc.calls.forEach(function (c) {
+      var card = document.createElement("div"); card.className = "card row";
+      card.innerHTML = '<b>' + t("table") + " " + esc(c.table) + "</b> <span class=\"mut\">" +
+        t(c.kind === "bill" ? "billCall" : "waiterCall") + '</span><span class="grow"></span>';
+      var b = document.createElement("button"); b.className = "sm"; b.textContent = t("done");
+      b.addEventListener("click", function () { send({ t: "ack", table: c.table, kind: c.kind }); });
+      card.appendChild(b); cEl2.appendChild(card);
+    });
+  }
+
+  function stat(label, value) { return '<div class="card"><small class="mut">' + label + "</small><b>" + value + "</b></div>"; }
+
+  function orderCard(o, actions) {
+    var card = document.createElement("div"); card.className = "order";
+    var lines = o.items.map(function (l) { return l.qty + "× " + esc(l.name); }).join("<br>");
+    card.innerHTML = '<div class="top"><b>' + t("table") + " " + esc(o.table) + " · " + esc(o.by) + "</b>" +
+      statusPill(o.status) + "</div><div class=\"mut\">" + lines + "</div>" +
+      (o.note ? '<div class="mut">“' + esc(o.note) + '”</div>' : "") +
+      '<div class="top" style="margin-top:6px"><span class="mut">' + C.money(C.totalOf(o)) + "</span><span class=\"grow\"></span></div>";
+    if (actions) {
+      var bar = card.querySelector(".top:last-child");
+      [["preparing", t("prep")], ["served", t("serve")], ["cancelled", t("cancel")]].forEach(function (p) {
+        var b = document.createElement("button"); b.className = "sm"; b.textContent = p[1];
+        b.addEventListener("click", function () { send({ t: "status", id: o.id, status: p[0] }); });
+        bar.appendChild(b);
+      });
+    }
+    return card;
+  }
+
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+
+  paintStatus(); label(); render();
+})();
+</script>
+</body>
+</html>
