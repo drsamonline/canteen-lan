@@ -1,5 +1,11 @@
 # Canteen
 
+<!-- shot:start -->
+
+![Screenshot](docs/shot.png)
+
+<!-- shot:end -->
+
 [![live](https://img.shields.io/badge/live-online-22c55e)](https://drsamonline.github.io/canteen-lan/)
 [![license](https://img.shields.io/badge/license-PolyForm Noncommercial-blue)](LICENSE)
 [![tests](https://img.shields.io/badge/tests-78%20passed-22c55e)](test-node.js)
