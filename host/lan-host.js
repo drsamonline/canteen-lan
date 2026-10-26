@@ -9,7 +9,7 @@
  *   host.onMessage(m => console.log("got", m));   // observe
  *   host.broadcast({ hello: "room" });            // push to everyone
  *
- * MIT License. (c) 2026 Dr Sohil Momin.
+ * PolyForm Noncommercial License 1.0.0. (c) 2026 Dr Sohil Momin.
  */
 "use strict";
 const http = require("http");
