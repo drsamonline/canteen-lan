@@ -8,7 +8,7 @@
  * The host keeps the last 500 messages and replays them to a late joiner, and it
  * seeds the room with the menu so every device that joins sees the same prices.
  *
- * MIT License. (c) 2026 Dr Sohil Momin. Part of the Forge system.
+ * PolyForm Noncommercial License 1.0.0. (c) 2026 Dr Sohil Momin. Part of the Forge system.
  */
 "use strict";
 const os = require("os");
