@@ -8,7 +8,7 @@
  *                          onMessage: m => console.log("got", m) });
  *   c.send({ from: "me", text: "hello room" });
  *
- * MIT License. (c) 2026 Dr Sohil Momin.
+ * PolyForm Noncommercial 1.0.0. (c) 2026 Dr Sohil Momin.
  */
 (function (root) {
   "use strict";
