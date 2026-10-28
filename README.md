@@ -48,8 +48,7 @@ price in paise).
   host address and tap **Join room**;
 
 or run it locally: open `docs/play/index.html` in a browser (the engine
-`docs/play/canteen.js`, the transport `docs/play/lan-kit.js` and the shared runtime
-`docs/play/web-kit.js` sit next to it, so it works from `file://` too).
+`docs/play/canteen.js`, the transport `docs/play/lan-kit.js` sit next to it, so it works from `file://` too).
 
 ```
 node test-node.js      # 78 passed, 0 failed
