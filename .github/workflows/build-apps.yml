@@ -73,7 +73,18 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: gh release upload
+      - name: gh release upload + notes
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload app-latest docs/icon.png#canteen-lan-icon.png --clobber -R "${{ github.repository }}"
+          REPO: ${{ github.repository }}
+        run: |
+          # `file#label` sets the asset's LABEL, not its name, so copy it first
+          cp docs/icon.png canteen-lan-icon.png
+          gh release upload app-latest canteen-lan-icon.png --clobber -R "$REPO"
+          gh release delete-asset app-latest icon.png --yes -R "$REPO" || true
+          # the mark in the release notes, so the page is recognisable at a glance
+          gh release edit app-latest -R "$REPO" --notes "Rolling build of **Canteen LAN** — order from your table over the room's own Wi-Fi.
+
+![Canteen LAN](https://raw.githubusercontent.com/$REPO/main/docs/icon.png)
+
+One commit, one release: the APK, the portable EXE and the Linux binary below all come from the same commit as the live demo. Offline, no accounts, no runtime dependency."
