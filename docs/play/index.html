@@ -50,6 +50,10 @@
   .demobar{max-width:900px;margin:12px auto 0;padding:9px 14px;border:1px dashed var(--warn);border-radius:10px;
     color:var(--warn);font-size:13px;line-height:1.5}
   label{font-size:13px;color:var(--mut);display:block;margin-bottom:3px}
+  /* the join row is a flex pair with a fixed-width table cell; without this the
+     native input width (20 chars) overflows the card on a wide screen */
+  #join .row>div{min-width:0}
+  #join input{width:100%}
 </style>
 </head>
 <body>
@@ -196,7 +200,7 @@
 
   $("name").value = me.name || "";
   $("table").value = me.table || "";
-  $("host").value = me.host || Lan.hostUrl(8080);
+  $("host").value = me.host || (location.hostname ? Lan.hostUrl(8080) : "http://192.168.1.20:8080");
   $("build").textContent = "build " + BUILD;
 
   if (demo) {
