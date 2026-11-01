@@ -303,7 +303,12 @@
 
   $("name").value = me.name || "";
   $("table").value = me.table || "";
-  $("host").value = me.host || (location.hostname ? Lan.hostUrl(8080) : "http://192.168.1.20:8080");
+  /* A published board is served from a public hostname, so defaulting the room
+     address to it would be a wrong answer. Only pre-fill when this page really is
+     on a private address; otherwise leave the hint and let the guest paste the
+     address the host printed. */
+  var priv = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname || "");
+  $("host").value = me.host || (priv ? Lan.hostUrl(8080) : "");
   $("pin").value = me.pin || "";
   $("build").textContent = "build " + BUILD;
   paintSound();
