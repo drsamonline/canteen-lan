@@ -83,8 +83,11 @@ jobs:
           gh release upload app-latest canteen-lan-icon.png --clobber -R "$REPO"
           gh release delete-asset app-latest icon.png --yes -R "$REPO" || true
           # the mark in the release notes, so the page is recognisable at a glance
-          gh release edit app-latest -R "$REPO" --notes "Rolling build of **Canteen LAN** — order from your table over the room's own Wi-Fi.
-
-![Canteen LAN](https://raw.githubusercontent.com/$REPO/main/docs/icon.png)
-
-One commit, one release: the APK, the portable EXE and the Linux binary below all come from the same commit as the live demo. Offline, no accounts, no runtime dependency."
+          {
+            echo "Rolling build of **Canteen LAN** — order from your table over the room's own Wi-Fi."
+            echo
+            echo "![Canteen LAN](https://raw.githubusercontent.com/$REPO/main/docs/icon.png)"
+            echo
+            echo "One commit, one release: the APK, the portable EXE and the Linux binary below all come from the same commit as the live demo. Offline, no accounts, no runtime dependency."
+          } > "$RUNNER_TEMP/notes.md"
+          gh release edit app-latest -R "$REPO" --notes-file "$RUNNER_TEMP/notes.md"
