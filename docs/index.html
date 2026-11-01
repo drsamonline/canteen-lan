@@ -209,7 +209,7 @@
       </div>
       <div class="badges">
         <a href="https://drsamonline.github.io/canteen-lan/"><img src="assets/badge-live.svg" alt="live: online" width="98" height="22"></a>
-        <img src="assets/badge-tests.svg" alt="tests: 175 passing" width="118" height="22">
+        <img src="assets/badge-tests.svg" alt="tests: 211 passing" width="118" height="22">
         <img src="assets/badge-deps.svg" alt="deps: 0 runtime" width="104" height="22">
         <img src="assets/badge-offline.svg" alt="offline: no network" width="118" height="22">
         <img src="assets/badge-licence.svg" alt="licence: PolyForm NC 1.0.0" width="160" height="22">
@@ -257,6 +257,8 @@
       <button type="button" data-view="kitchen" aria-pressed="true">Kitchen board</button>
       <button type="button" data-view="guest" aria-pressed="false">Guest menu</button>
       <button type="button" data-view="calls" aria-pressed="false">Calls &amp; tables</button>
+      <button type="button" data-view="floor" aria-pressed="false">Floor</button>
+      <button type="button" data-view="slip" aria-pressed="false">Guest bill</button>
       <button type="button" data-view="menu" aria-pressed="false">Menu editor</button>
       <span class="note">same code as <span class="mono">play/</span> · nothing is sent anywhere</span>
     </div>
@@ -271,22 +273,24 @@
         <div class="n">GUEST</div>
         <h3>Order from the seat</h3>
         <p>Pick a table and a name, search or filter the menu by tag, add items to a cart that
-          survives a reload, and place it with a note. Your table's bill stays visible, and you can
-          call the waiter or ask for the bill.</p>
+          survives a reload, and place it with a note. Your table's bill stays visible, and
+          <b>Show my bill</b> gives you an itemised slip with a code the counter can read.</p>
       </div>
       <div class="card">
         <div class="n">KITCHEN</div>
         <h3>Every table, live</h3>
-        <p>Orders arrive grouped by table with the running bill and how long each has waited. Mark
-          one preparing, served or cancelled, undo the last move, split a table's bill across heads,
-          edit the menu, read the shift report, print a KOT, and export the day as CSV.</p>
+        <p>Orders arrive grouped by table — or as a <b>floor</b> of tiles you can tap — with the
+          running bill and how long each has waited. Mark one preparing, served or cancelled, undo
+          the last move, split a bill across heads, edit the menu and its <b>stock counts</b>, read
+          the shift report, print a KOT, and export the day as CSV.</p>
       </div>
       <div class="card">
         <div class="n">ROOM</div>
         <h3>The Wi-Fi is the server</h3>
         <p>A tiny Node host serves the board itself, journals every message to a plain file,
           replays the shift to anyone who joins late or after a restart, and broadcasts over
-          Server-Sent Events. Phones talk back with a plain POST.</p>
+          Server-Sent Events. <span class="mono">--mirror</span> keeps a second host in step, so the
+          counter survives the laptop.</p>
       </div>
     </div>
   </div>
@@ -349,9 +353,9 @@
   <div class="wrap">
     <div class="head"><span class="n">05</span><h2>The numbers</h2><span class="ln"></span></div>
     <div class="nums">
-      <div class="num"><b>175</b><span>tests passing</span></div>
+      <div class="num"><b>211</b><span>tests passing</span></div>
       <div class="num"><b>0</b><span>runtime deps</span></div>
-      <div class="num"><b>11</b><span>protocol messages</span></div>
+      <div class="num"><b>12</b><span>protocol messages</span></div>
       <div class="num"><b>10</b><span>menu items seeded</span></div>
       <div class="num"><b>₹0</b><span>to host a room</span></div>
     </div>
@@ -372,7 +376,8 @@
 
 <span class="k">node</span> host/room.js <span class="k">--pin</span> 4821
 <span class="k">node</span> host/room.js <span class="k">--print</span> 192.168.1.50:9100
-<span class="k">node</span> host/room.js <span class="k">--menu</span> my-menu.json</pre>
+<span class="k">node</span> host/room.js <span class="k">--menu</span> my-menu.json
+<span class="k">node</span> host/room.js <span class="k">--mirror</span> 192.168.1.21:8080</pre>
       </div>
       <div>
         <pre><span class="c"># then, on any phone on the same Wi-Fi:</span>
@@ -384,7 +389,7 @@
 <span class="k">open</span> play/index.html<span class="k">?solo=1</span>
 
 <span class="c"># the whole mechanic, headless</span>
-<span class="k">node</span> test-node.js   <span class="c">→ 175 passed</span></pre>
+<span class="k">node</span> test-node.js   <span class="c">→ 211 passed</span></pre>
       </div>
     </div>
     <p class="fine" style="margin-top:20px">The journal lives in
@@ -422,14 +427,14 @@
   <div class="wrap">
     <div class="head"><span class="n">08</span><h2>What it could become</h2><span class="ln"></span></div>
     <ul class="next">
-      <li><b>A table map</b><span>A floor plan the waiter can tap — the same board, drawn as a grid
-        of seats with their bill and how long they have waited.</span></li>
-      <li><b>Stock, not just sold-out</b><span>Counts that decrement per order and stop at zero, so
-        the last plate of thali cannot be sold twice.</span></li>
-      <li><b>Two rooms, one shift</b><span>Let a host mirror its board to a second device over the
-        LAN, so the counter keeps running if the laptop dies.</span></li>
-      <li><b>Bills in the guest's hand</b><span>The same docket the host prints, shown on the phone
-        as a scannable slip the guest can pay against at the counter.</span></li>
+      <li><b>Hindi on the roll</b><span>The thermal docket is ASCII-only today, so a Hindi dish
+        name prints as a question mark. A bitmap font for the printer would fix it.</span></li>
+      <li><b>Modifiers, priced</b><span>Extra chutney, no sugar, an add-on that carries its own
+        price instead of a free-text note the kitchen has to read.</span></li>
+      <li><b>A menu that keeps time</b><span>Breakfast until eleven, lunch after — the same board
+        showing the right half of the menu without anyone switching it.</span></li>
+      <li><b>The shift on A4</b><span>The report as a printable page for the accounts, not just a
+        screen and a thermal slip.</span></li>
     </ul>
   </div>
 </section>
@@ -483,6 +488,8 @@
   function view(name) {
     var src = name === "guest" ? "play/?demo=1&table=12"
             : name === "calls" ? "play/?demo=1&view=kitchen&tab=calls"
+            : name === "floor" ? "play/?demo=1&view=kitchen&tab=floor"
+            : name === "slip" ? "play/?demo=1&table=12&slip=1"
             : name === "menu" ? "play/?demo=1&view=kitchen&tab=menu"
             : "play/?demo=1&view=kitchen";
     frame.src = src;
@@ -506,7 +513,7 @@
     });
   }
 
-  document.getElementById("stamp").textContent = "build 1.2.0 · 2026-11-01";
+  document.getElementById("stamp").textContent = "build 1.3.0 · 2026-11-01";
 })();
 </script>
 </body>

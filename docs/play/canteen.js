@@ -23,7 +23,7 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var VERSION = "1.2.0";
+  var VERSION = "1.3.0";
 
   var MAX_ORDERS = 5000;
   var MAX_ITEMS_PER_ORDER = 50;
@@ -32,6 +32,7 @@
   var MAX_PRICE = 100000000;        /* paise: ₹10,00,000 */
   var MAX_CALLS = 500;
   var MAX_LOG = 500;
+  var MAX_STOCK = 9999;
   var SKU = /^[a-z0-9][a-z0-9-]{0,23}$/;
   var STATUSES = { placed: 1, preparing: 1, served: 1, cancelled: 1 };
   var CALL_KINDS = { waiter: 1, bill: 1 };
@@ -57,6 +58,14 @@
     p = Number(p);
     if (!isNum(p) || p < 0) return 0;
     return Math.min(MAX_PRICE, Math.floor(p));
+  }
+
+  /* null means "as many as you like"; a number is a count that runs out. */
+  function normStock(v) {
+    if (v === null || v === undefined || v === "") return null;
+    var n = Number(v);
+    if (!isNum(n)) return null;
+    return Math.min(MAX_STOCK, Math.max(0, Math.floor(n)));
   }
 
   function normTable(t) {
@@ -137,7 +146,8 @@
       price: normPrice(m.price),
       names: normNames(m.names),
       tags: normTags(m.tags),
-      soldOut: m.soldOut === true || m.soldOut === 1 || m.soldOut === "true"
+      soldOut: m.soldOut === true || m.soldOut === 1 || m.soldOut === "true",
+      stock: normStock(m.stock)
     };
   }
 
@@ -224,8 +234,30 @@
     return doc;
   }
 
+  /* On the guest menu unless the kitchen took it off, or the last one went. */
+  function isAvailable(item) {
+    if (!item || item.soldOut) return false;
+    return item.stock == null || item.stock > 0;
+  }
+
   function availableMenu(doc) {
-    return ((doc && doc.menu) || []).filter(function (m) { return !m.soldOut; });
+    return ((doc && doc.menu) || []).filter(isAvailable);
+  }
+
+  function remainingStock(doc, sku) {
+    var m = menuItem(doc, sku);
+    if (!m) return 0;
+    return m.stock == null ? null : m.stock;
+  }
+
+  /* A count, not a flag: "twelve thalis left" rather than "sold out". */
+  function setStock(doc, sku, stock, by) {
+    var m = menuItem(doc, sku);
+    if (!m) return doc;
+    m.stock = normStock(stock);
+    doc.rev++;
+    logAdd(doc, { kind: "stock:set", id: m.sku, status: m.stock == null ? "unlimited" : String(m.stock), by: by });
+    return doc;
   }
 
   /* Search across the room name, every language name and the tags. */
@@ -233,7 +265,7 @@
     opts = opts || {};
     var q = String(query == null ? "" : query).trim().toLowerCase();
     return ((doc && doc.menu) || []).filter(function (m) {
-      if (opts.hideSoldOut && m.soldOut) return false;
+      if (opts.hideSoldOut && !isAvailable(m)) return false;
       if (opts.tag && (m.tags || []).indexOf(opts.tag) < 0) return false;
       if (!q) return true;
       var hay = [m.sku, m.name].concat(Object.keys(m.names || {}).map(function (k) { return m.names[k]; }))
@@ -252,11 +284,14 @@
       var sku = normSku(line.sku), qty = normQty(line.qty);
       if (!sku || qty < 1) return;
       var m = menuItem(doc, sku);
-      if (!m || m.soldOut) return;
+      if (!isAvailable(m)) return;
+      /* a counted item can only be ordered as far as the count goes */
+      var cap = m.stock == null ? MAX_QTY : Math.min(MAX_QTY, m.stock);
+      if (cap < 1) return;
       var existing = null;
       for (var i = 0; i < out.length; i++) if (out[i].sku === sku) existing = out[i];
-      if (existing) existing.qty = Math.min(MAX_QTY, existing.qty + qty);
-      else out.push({ sku: sku, name: m.name, price: m.price, qty: qty });
+      if (existing) existing.qty = Math.min(cap, existing.qty + qty);
+      else out.push({ sku: sku, name: m.name, price: m.price, qty: Math.min(cap, qty) });
       if (out.length > MAX_ITEMS_PER_ORDER) out.length = MAX_ITEMS_PER_ORDER;
     });
     return out;
@@ -296,6 +331,12 @@
     if (orderById(doc, order.id)) return doc;
     if (doc.orders.length >= MAX_ORDERS) doc.orders.shift();
     doc.orders.push(order);
+    /* the count comes off the menu as the order goes on the board, so a replay
+       of the same messages lands on the same numbers */
+    order.items.forEach(function (l) {
+      var m = menuItem(doc, l.sku);
+      if (m && m.stock != null) m.stock = Math.max(0, m.stock - normQty(l.qty));
+    });
     doc.rev++;
     logAdd(doc, { kind: "order", id: order.id, table: order.table, by: order.by, ts: order.ts });
     return doc;
@@ -366,6 +407,50 @@
     var base = Math.floor(total / heads), rem = total - base * heads, shares = [];
     for (var i = 0; i < heads; i++) shares.push(base + (i < rem ? 1 : 0));
     return { table: normTable(table), total: total, heads: heads, shares: shares, each: base };
+  }
+
+  /* The room as a floor: one tile per table, with its bill, its open orders and
+   * how long the oldest one has waited. This is what a waiter taps. */
+  function floorPlan(doc, now) {
+    var by = {}, order = [];
+    function tile(t) {
+      if (!by[t]) { by[t] = { table: t, orders: 0, open: 0, total: 0, oldest: null, calls: [] }; order.push(t); }
+      return by[t];
+    }
+    ((doc && doc.orders) || []).forEach(function (o) {
+      var t = tile(o.table);
+      t.orders++;
+      if (o.status === "placed" || o.status === "preparing") {
+        t.open++;
+        var age = ageMinutes(o, now);
+        if (age != null && (t.oldest == null || age > t.oldest)) t.oldest = age;
+      }
+      if (o.status !== "cancelled") t.total += totalOf(o);
+    });
+    ((doc && doc.calls) || []).forEach(function (c) { tile(c.table).calls.push(c.kind); });
+    return order.map(function (k) { return by[k]; }).sort(function (a, b) {
+      return String(a.table).localeCompare(String(b.table), "en", { numeric: true });
+    });
+  }
+
+  /* What the guest is shown, and what the counter can check: the table's bill,
+   * itemised, with the order ids that make it up. */
+  function billSlip(doc, table) {
+    table = normTable(table);
+    var orders = ordersForTable(doc, table).filter(function (o) { return o.status !== "cancelled"; });
+    var lines = [], by = {}, total = 0;
+    orders.forEach(function (o) {
+      o.items.forEach(function (l) {
+        var k = l.sku;
+        if (!by[k]) { by[k] = { sku: k, name: l.name, price: normPrice(l.price), qty: 0 }; lines.push(by[k]); }
+        by[k].qty += normQty(l.qty);
+      });
+      total += totalOf(o);
+    });
+    return {
+      table: table, lines: lines, total: total, count: orders.length,
+      ids: orders.map(function (o) { return o.id; })
+    };
   }
 
   /* How long an order has been open, in whole minutes. Null when the order
@@ -439,6 +524,7 @@
       case "menu:set":    upsertMenuItem(doc, msg.item, msg.by); break;
       case "menu:del":    removeMenuItem(doc, msg.sku, msg.by); break;
       case "menu:sold":   setSoldOut(doc, msg.sku, msg.soldOut, msg.by); break;
+      case "stock:set":   setStock(doc, msg.sku, msg.stock, msg.by); break;
       case "order":
         addOrder(doc, newOrder({
           id: msg.id, table: msg.table, by: msg.by, note: msg.note, ts: msg.ts,
@@ -505,7 +591,8 @@
       tables: Object.keys(tables).length,
       calls: ((doc && doc.calls) || []).length,
       menu: ((doc && doc.menu) || []).length,
-      soldOut: ((doc && doc.menu) || []).filter(function (m) { return m.soldOut; }).length
+      soldOut: ((doc && doc.menu) || []).filter(function (m) { return m.soldOut; }).length,
+      outOfStock: ((doc && doc.menu) || []).filter(function (m) { return m.stock === 0; }).length
     };
   }
 
@@ -536,7 +623,9 @@
       revenue: revenue,
       average: covers ? Math.round(revenue / covers) : 0,
       tables: Object.keys(tables).length,
-      top: top
+      top: top,
+      lowStock: ((doc && doc.menu) || []).filter(function (m) { return m.stock != null && m.stock <= 3; })
+        .map(function (m) { return { sku: m.sku, name: m.name, stock: m.stock }; })
     };
   }
 
@@ -582,6 +671,9 @@
       if (added) added.status = normStatus(o.status);
     });
     (raw.calls || []).forEach(function (c) { addCall(doc, c.table, c.kind); });
+    /* adding the orders above took their stock off the menu again; the snapshot
+       already holds the right counts, so restore them last */
+    if (Array.isArray(raw.menu)) doc.menu = normMenu(raw.menu);
     doc.log = [];
     (raw.log || []).forEach(function (e) { logAdd(doc, e); });
     doc.rev = raw.rev || doc.rev;
@@ -623,6 +715,7 @@
     normStatus: normStatus,
     normKind: normKind,
     normTags: normTags,
+    normStock: normStock,
     normNames: normNames,
     normMenu: normMenu,
     normMenuItem: normMenuItem,
@@ -633,6 +726,9 @@
     removeMenuItem: removeMenuItem,
     setSoldOut: setSoldOut,
     availableMenu: availableMenu,
+    isAvailable: isAvailable,
+    remainingStock: remainingStock,
+    setStock: setStock,
     searchMenu: searchMenu,
     resolveItems: resolveItems,
     totalOf: totalOf,
@@ -646,6 +742,8 @@
     ordersForTable: ordersForTable,
     tableTotals: tableTotals,
     splitBill: splitBill,
+    floorPlan: floorPlan,
+    billSlip: billSlip,
     ageMinutes: ageMinutes,
     addCall: addCall,
     ackCall: ackCall,

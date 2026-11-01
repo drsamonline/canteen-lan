@@ -80,12 +80,15 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   ok("POST /send with the pin is accepted", (await post(A, "/send", { t: "order", id: "sm1", table: "3", pin: PIN, items: [{ sku: "chai", qty: 2 }] })).status === 200);
   ok("a dish can be added over the wire", (await post(A, "/send", { t: "menu:set", pin: PIN, item: { sku: "misal", name: "Misal pav", price: 7000, tags: ["spicy"] } })).status === 200);
   ok("a dish can be marked sold out", (await post(A, "/send", { t: "menu:sold", pin: PIN, sku: "misal", soldOut: true })).status === 200);
+  ok("a dish can be given a count", (await post(A, "/send", { t: "stock:set", pin: PIN, sku: "thali", stock: 4 })).status === 200);
   await wait(350);
 
   const state = JSON.parse((await get(A, "/state")).body);
   ok("/state shows the order", state.orders.length === 1 && state.stats.revenue === 3000);
   ok("/state shows the new dish", state.stats.menu === 11);
   ok("/state shows it sold out", state.stats.soldOut === 1);
+  ok("/state carries the menu, counts and all",
+    (state.menu || []).filter(function (m) { return m.sku === "thali"; })[0].stock === 4);
   const report = JSON.parse((await get(A, "/report")).body);
   ok("/report computes the shift", report.covers === 1 && report.revenue === 3000);
   ok("/print without a printer explains itself", (await post(A, "/print", { id: "sm1", type: "kot" })).status === 501);
@@ -103,6 +106,27 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   ok("the menu edit survives a restart", after.stats.menu === 11 && after.stats.soldOut === 1);
   ok("the host says it restored from the journal", /restored from the journal/.test(b.out));
   b.kill();
+
+  /* ---- a second host, kept in step by --mirror ---- */
+  const C1 = 18095, C2 = 18094;
+  const standby = start(C2);
+  await wait(1300);
+  /* the standby keeps the room PIN, so the live host forwards with the same one */
+  const live = spawn("node", ["host/room.js", "--port", String(C1), "--data", data,
+    "--pin", PIN, "--mirror", "127.0.0.1:" + C2], { cwd: REPO });
+  live.stdout.on("data", function () {});
+  live.stderr.on("data", function () {});
+  await wait(1400);
+  await post(C1, "/send", { t: "order", id: "m1", table: "8", pin: PIN, items: [{ sku: "chai", qty: 3 }] });
+  await wait(500);
+  const mirrored = JSON.parse((await get(C2, "/state")).body);
+  ok("the mirror host sees the order", mirrored.orders.some(function (o) { return o.id === "m1"; }));
+  /* the standby shares the journal, so it holds the whole shift, not just what
+     was mirrored: chai x2 from the first phase plus chai x3 now */
+  ok("the mirror rebuilds the same bill", mirrored.stats.revenue === 3000 + 4500);
+  live.kill();
+  standby.kill();
+  await wait(200);
 
   const lines = fs.readFileSync(path.join(data, "room-canteen.jsonl"), "utf8").trim().split("\n");
   ok("the journal is plain JSONL, one message per line", lines.length >= 3 && lines.every(function (l) {

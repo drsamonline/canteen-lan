@@ -67,11 +67,26 @@
   .mi:last-child{border-bottom:0}
   .mi .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
   @media(max-width:620px){.mi{grid-template-columns:1fr;gap:6px}.mi .acts{justify-content:flex-start}}
-  .form{display:grid;grid-template-columns:1.4fr .7fr .7fr;gap:8px;align-items:end}
+  .form{display:grid;grid-template-columns:1.4fr .7fr .7fr .6fr;gap:8px;align-items:end}
   @media(max-width:620px){.form{grid-template-columns:1fr}}
   .tags{display:flex;flex-wrap:wrap;gap:6px}
   .tags button{font-size:12px;padding:5px 10px;border-radius:999px;background:transparent;color:var(--mut)}
   .tags button.on{color:var(--acc);border-color:var(--acc)}
+  .floor{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:10px;margin-bottom:6px}
+  .tile{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;
+        background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 12px;cursor:pointer}
+  .tile b{font-size:19px}
+  .tile span{font-size:13px;color:var(--ink)}
+  .tile small{font-size:11.5px;color:var(--mut)}
+  .tile em{font-style:normal;font-size:11.5px;color:var(--warn)}
+  .tile.on{border-color:var(--acc)}
+  .tile.call{border-color:var(--warn)}
+  .slipcard{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start}
+  @media(max-width:520px){.slipcard{grid-template-columns:1fr}}
+  .slipqr{background:#fff;padding:8px;border-radius:8px;line-height:0}
+  .slipqr svg{width:132px;height:132px;display:block}
+  .slipbody{min-width:0}
+  .slipbody small{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;word-break:break-all}
 </style>
 </head>
 <body>
@@ -133,7 +148,9 @@
       <div class="row" style="margin-top:10px">
         <button id="waiterBtn"></button>
         <button id="billBtn"></button>
+        <button id="slipBtn" class="ghost"></button>
       </div>
+      <div id="slip" hidden></div>
     </div>
 
     <div id="kitchen" hidden>
@@ -143,6 +160,7 @@
       <div class="row tabs" style="margin-top:14px">
         <button id="tabOrders" class="primary sm"></button>
         <button id="tabCalls" class="ghost sm"></button>
+        <button id="tabFloor" class="ghost sm"></button>
         <button id="tabMenu" class="ghost sm"></button>
         <button id="tabReport" class="ghost sm"></button>
       </div>
@@ -159,12 +177,15 @@
 
       <div id="kcalls" style="margin-top:8px" hidden></div>
 
+      <div id="kfloor" style="margin-top:8px" hidden></div>
+
       <div id="kmenu" style="margin-top:8px" hidden>
         <div class="card" style="margin-bottom:12px">
           <div class="form">
             <div><label id="lItemName"></label><input id="miName" placeholder="Poha"></div>
             <div><label id="lItemPrice"></label><input id="miPrice" placeholder="35" inputmode="decimal"></div>
             <div><label id="lItemSku"></label><input id="miSku" placeholder="poha"></div>
+            <div><label id="lItemStock"></label><input id="miStock" placeholder="—" inputmode="numeric"></div>
           </div>
           <div class="tags" id="miTags" style="margin-top:10px"></div>
           <div class="row" style="margin-top:10px">
@@ -196,6 +217,7 @@
 
 <script src="web-kit.js"></script>
 <script src="lan-kit.js"></script>
+<script src="qr.js"></script>
 <script src="canteen.js"></script>
 <script>
 (function () {
@@ -225,7 +247,10 @@
           printerOff: "No printer on the room host — this prints through your browser.",
           soloHint: "One device runs the whole canteen. Nothing leaves this phone or laptop.",
           joinHint: "The host prints this address when it starts. Leave the PIN empty if the room has none.",
-          menuHint: "Changes go to every device in the room at once. A sold-out item stays on bills already placed." },
+          menuHint: "Changes go to every device in the room at once. A sold-out item stays on bills already placed.",
+          floor: "Floor", slip: "Bill slip", showSlip: "Show my bill", hideSlip: "Hide the slip",
+          stock: "Stock (blank = unlimited)", left: "left", lowStock: "Running out",
+          unlimited: "unlimited", printSlip: "Print the slip", tileOpen: "open" },
     hi: { tag: "अपनी मेज़ से ऑर्डर करें", join: "कमरे में जुड़ें", name: "आपका नाम", table: "मेज़",
           host: "होस्ट पता", pin: "रूम पिन", menu: "मेन्यू", cart: "आपका ऑर्डर",
           note: "टिप्पणी (वैकल्पिक)", place: "ऑर्डर दें", yourtable: "आपकी मेज़ पर",
@@ -247,7 +272,10 @@
           printerOff: "रूम होस्ट पर प्रिंटर नहीं — ब्राउज़र से छपेगा।",
           soloHint: "एक ही डिवाइस पूरी कैंटीन चलाए। कुछ भी बाहर नहीं जाता।",
           joinHint: "होस्ट शुरू होने पर यह पता दिखाता है। पिन खाली छोड़ें अगर रूम में नहीं है।",
-          menuHint: "बदलाव तुरंत सभी डिवाइस पर जाते हैं। खत्म वस्तु पहले दिए बिलों पर रहती है।" },
+          menuHint: "बदलाव तुरंत सभी डिवाइस पर जाते हैं। खत्म वस्तु पहले दिए बिलों पर रहती है।",
+          floor: "फ़्लोर", slip: "बिल पर्ची", showSlip: "मेरा बिल दिखाएँ", hideSlip: "पर्ची छिपाएँ",
+          stock: "स्टॉक (खाली = असीमित)", left: "बाकी", lowStock: "खत्म होने वाला",
+          unlimited: "असीमित", printSlip: "पर्ची छापें", tileOpen: "बाकी" },
     gu: { tag: "તમારા ટેબલથી ઓર્ડર કરો", join: "રૂમમાં જોડાઓ", name: "તમારું નામ", table: "ટેબલ",
           host: "હોસ્ટ સરનામું", pin: "રૂમ પિન", menu: "મેનૂ", cart: "તમારો ઓર્ડર",
           note: "નોંધ (વૈકલ્પિક)", place: "ઓર્ડર કરો", yourtable: "તમારા ટેબલ પર",
@@ -269,7 +297,10 @@
           printerOff: "રૂમ હોસ્ટ પર પ્રિન્ટર નથી — બ્રાઉઝરથી છપાશે.",
           soloHint: "એક જ ડિવાઇસ આખી કેન્ટીન ચલાવે. કંઈ બહાર જતું નથી.",
           joinHint: "હોસ્ટ શરૂ થાય ત્યારે આ સરનામું બતાવે છે. પિન ખાલી રાખો જો રૂમમાં ન હોય.",
-          menuHint: "ફેરફાર તરત જ બધા ડિવાઇસ પર જાય છે. ખતમ વસ્તુ પહેલાં આપેલા બિલ પર રહે છે." }
+          menuHint: "ફેરફાર તરત જ બધા ડિવાઇસ પર જાય છે. ખતમ વસ્તુ પહેલાં આપેલા બિલ પર રહે છે.",
+          floor: "ફ્લોર", slip: "બિલ પરચી", showSlip: "મારું બિલ બતાવો", hideSlip: "પરચી છુપાવો",
+          stock: "સ્ટોક (ખાલી = અમર્યાદિત)", left: "બાકી", lowStock: "ખતમ થવાનું",
+          unlimited: "અમર્યાદિત", printSlip: "પરચી છાપો", tileOpen: "બાકી" }
   };
   ["en", "hi", "gu"].forEach(function (l) { L.i18n.extend(l, S[l]); });
   function t(k) { return L.i18n.t(k); }
@@ -281,6 +312,7 @@
   var me = L.storage.get("canteen:me", {});
   var client = null, heads = {}, filter = "", editing = "", soundOn = L.storage.get("canteen:sound", false);
   var outbox = L.storage.get("canteen:outbox", []);
+  var floorSel = "", slipOpen = false;
   var seenOrders = {}, seenCalls = {};
 
   /* ---- mode ----
@@ -290,7 +322,7 @@
   var qs = new URLSearchParams(location.search);
   var demo = qs.get("demo") === "1";
   var solo = qs.get("solo") === "1";
-  var BUILD = "1.2.0 · 2026-11-01";
+  var BUILD = "1.3.0 · 2026-11-01";
 
   /* ---- boot ---- */
   L.theme.apply();
@@ -320,6 +352,8 @@
     if (qs.get("tab") === "calls") tab = "calls";
     if (qs.get("tab") === "menu") tab = "menu";
     if (qs.get("tab") === "report") tab = "report";
+    if (qs.get("tab") === "floor") tab = "floor";
+    if (qs.get("slip") === "1") slipOpen = true;
     me = { name: "Aarti", table: qs.get("table") || "12", host: "", pin: "" };
     banner("Demo board — sample orders seeded in this page. " +
       (kitchen ? "Press Preparing / Served to move them along." : "Add to the cart and place the order.") +
@@ -346,12 +380,14 @@
   $("search").addEventListener("input", function () { filter = this.value; render(); });
   $("tabOrders").addEventListener("click", function () { tab = "orders"; render(); });
   $("tabCalls").addEventListener("click", function () { tab = "calls"; render(); });
+  $("tabFloor").addEventListener("click", function () { tab = "floor"; render(); });
   $("tabMenu").addEventListener("click", function () { tab = "menu"; render(); });
   $("tabReport").addEventListener("click", function () { tab = "report"; render(); });
   $("clearBtn").addEventListener("click", function () { send({ t: "clear", by: me.name }); });
   $("undoBtn").addEventListener("click", function () { send({ t: "undo", by: me.name }); });
   $("exportBtn").addEventListener("click", exportCSV);
   $("printReport").addEventListener("click", function () { printReport(); });
+  $("slipBtn").addEventListener("click", function () { slipOpen = !slipOpen; render(); });
   $("miSave").addEventListener("click", saveItem);
   $("miReset").addEventListener("click", function () { editing = ""; fillItemForm(null); });
 
@@ -380,7 +416,10 @@
     $("viewBtn").textContent = kitchen ? t("guest") : t("kitchen");
     $("hKitchen").textContent = t("kitchen");
     $("tabOrders").textContent = t("orders"); $("tabCalls").textContent = t("calls");
+    $("tabFloor").textContent = t("floor");
     $("tabMenu").textContent = t("menuTab"); $("tabReport").textContent = t("report");
+    $("slipBtn").textContent = slipOpen ? t("hideSlip") : t("showSlip");
+    $("lItemStock").textContent = t("stock");
     $("clearBtn").textContent = t("clear"); $("exportBtn").textContent = t("export");
     $("undoBtn").textContent = "↶ " + t("undo");
     $("lItemName").textContent = t("itemName"); $("lItemPrice").textContent = t("price");
@@ -550,6 +589,7 @@
     $("miName").value = item ? item.name : "";
     $("miPrice").value = item ? (item.price / 100) : "";
     $("miSku").value = item ? item.sku : "";
+    $("miStock").value = item && item.stock != null ? item.stock : "";
     var tags = item ? (item.tags || []) : [];
     var box = $("miTags");
     box.innerHTML = "";
@@ -575,7 +615,8 @@
     var existing = C.menuItem(doc, sku);
     send({ t: "menu:set", by: me.name, item: {
       sku: sku, name: name, price: Math.round(rupees * 100), tags: tags,
-      names: existing ? existing.names : {}, soldOut: existing ? existing.soldOut : false
+      names: existing ? existing.names : {}, soldOut: existing ? existing.soldOut : false,
+      stock: C.normStock($("miStock").value)
     } });
     fillItemForm(null);
     $("miMsg").textContent = t("menu") + ": " + name;
@@ -599,12 +640,15 @@
     if (!list.length) mEl.innerHTML = '<div class="card empty">' + t("empty") + "</div>";
     list.forEach(function (it) {
       var q = cart[it.sku] || 0;
+      var off = !C.isAvailable(it);
       var card = document.createElement("div");
-      card.className = "card" + (it.soldOut ? " sold" : "");
+      card.className = "card" + (off ? " sold" : "");
       var tagHtml = (it.tags || []).map(function (x) { return '<span class="tag">' + esc(x) + "</span>"; }).join("");
+      if (it.stock != null) tagHtml += '<span class="tag' + (it.stock <= 3 ? " on" : "") + '">' +
+        (it.stock > 0 ? it.stock + " " + t("left") : t("soldOutShort")) + "</span>";
       card.innerHTML = '<div class="item"><div><b>' + esc(C.menuItemName(it, L.i18n.lang)) + "</b><br><small>" +
         C.money(it.price) + "</small><br>" + tagHtml + "</div>" +
-        (it.soldOut ? '<span class="tag">' + t("soldOutShort") + "</span>" :
+        (off ? '<span class="tag">' + t("soldOutShort") + "</span>" :
           '<div class="qty"><button data-m="-1" aria-label="−">&minus;</button><span>' + q +
           '</span><button data-m="1" aria-label="+">+</button></div>') + "</div>";
       card.querySelectorAll("button").forEach(function (b) {
@@ -635,6 +679,7 @@
     var mineEl = $("mine"); mineEl.innerHTML = "";
     if (!mine.length) mineEl.innerHTML = '<div class="card empty">' + t("empty") + "</div>";
     else mine.slice().reverse().forEach(function (o) { mineEl.appendChild(orderCard(o, false)); });
+    renderSlip();
     var calls = C.callsForTable(doc, me.table || "?");
     if (calls.length) mineEl.insertAdjacentHTML("afterbegin",
       '<div class="card mut">' + calls.map(function (c) {
@@ -644,18 +689,21 @@
     var st = C.stats(doc);
     $("kstats").innerHTML =
       stat(t("open"), st.open) + stat(t("tables"), st.tables) + stat(t("items"), st.items) +
-      stat(t("revenue"), C.money(st.revenue)) + stat(t("soldOut"), st.soldOut);
+      stat(t("revenue"), C.money(st.revenue)) + stat(t("soldOut"), st.soldOut) +
+      stat(t("menuTab"), st.menu);
 
-    ["orders", "calls", "menu", "report"].forEach(function (k) {
+    ["orders", "calls", "floor", "menu", "report"].forEach(function (k) {
       var b = $("tab" + k.charAt(0).toUpperCase() + k.slice(1));
       b.className = (tab === k ? "primary " : "ghost ") + "sm";
     });
     $("korders").hidden = tab !== "orders";
     $("kcalls").hidden = tab !== "calls";
+    $("kfloor").hidden = tab !== "floor";
     $("kmenu").hidden = tab !== "menu";
     $("kreport").hidden = tab !== "report";
 
     if (tab === "orders") renderOrders();
+    if (tab === "floor") renderFloor();
     if (tab === "calls") renderCalls();
     if (tab === "menu") renderMenuEditor();
     if (tab === "report") renderReport();
@@ -706,6 +754,66 @@
     });
   }
 
+  /* ---- the floor: one tile per table, tap to open it ---- */
+  function renderFloor() {
+    var box = $("kfloor");
+    box.innerHTML = "";
+    var tiles = C.floorPlan(doc, Date.now());
+    if (!tiles.length) { box.innerHTML = '<div class="card empty">' + t("empty") + "</div>"; return; }
+    var grid = document.createElement("div");
+    grid.className = "floor";
+    tiles.forEach(function (tl) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "tile" + (floorSel === tl.table ? " on" : "") + (tl.calls.length ? " call" : "");
+      b.setAttribute("aria-label", t("table") + " " + tl.table + ", " + C.money(tl.total));
+      b.innerHTML = "<b>" + esc(tl.table) + "</b><span>" + C.money(tl.total) + "</span><small>" +
+        tl.open + " " + t("tileOpen") + (tl.oldest != null ? " · " + tl.oldest + " " + t("minutes") : "") +
+        "</small>" + (tl.calls.length ? "<em>" + tl.calls.map(function (k) {
+          return k === "bill" ? t("billCall") : t("waiterCall"); }).join(" · ") + "</em>" : "");
+      b.addEventListener("click", function () { floorSel = floorSel === tl.table ? "" : tl.table; render(); });
+      grid.appendChild(b);
+    });
+    box.appendChild(grid);
+    if (!floorSel) return;
+    var h = document.createElement("div");
+    h.className = "table-h";
+    h.innerHTML = "<b>" + t("table") + " " + esc(floorSel) + '</b><span class="mut">' +
+      C.money(C.tableTotals(doc)[floorSel] || 0) + "</span>";
+    box.appendChild(h);
+    C.ordersForTable(doc, floorSel).forEach(function (o) { box.appendChild(orderCard(o, true)); });
+  }
+
+  /* ---- the guest's own slip: the bill, and a code the counter can read ---- */
+  function renderSlip() {
+    var el = $("slip");
+    if (!slipOpen) { el.hidden = true; return; }
+    var slip = C.billSlip(doc, me.table || "?");
+    if (!slip.lines.length) { el.hidden = true; return; }
+    /* short enough to stay a small QR: table, total in paise, covers, first id */
+    var payload = ("CANTEEN|" + slip.table + "|" + slip.total + "|" + slip.count + "|" + (slip.ids[0] || "")).slice(0, 70);
+    var svg = (window.QR && window.QR.toSVG) ? window.QR.toSVG(payload, { scale: 4, border: 2, dark: "#14120f" }) : "";
+    el.innerHTML = '<div class="card slipcard" style="margin-top:10px">' +
+      '<div class="slipqr">' + svg + "</div>" +
+      '<div class="slipbody"><b>' + t("table") + " " + esc(slip.table) + "</b>" +
+      slip.lines.map(function (l) {
+        return '<div class="line"><span>' + esc(l.name) + " &times; " + l.qty + "</span><span>" +
+          C.money(l.price * l.qty) + "</span></div>";
+      }).join("") +
+      '<div class="line"><b>' + t("total") + "</b><b>" + C.money(slip.total) + "</b></div>" +
+      '<small class="mut">' + slip.count + " " + t("orders") + " · " + esc(payload) + "</small>" +
+      '<div class="row" style="margin-top:8px"><button class="sm ghost" id="slipPrint">' +
+      t("printSlip") + "</button></div></div></div>";
+    el.hidden = false;
+    var pb = $("slipPrint");
+    if (pb) pb.addEventListener("click", function () {
+      printDocket(t("slip") + " · " + t("table") + " " + slip.table,
+        slip.lines.map(function (l) { return [l.qty + " × " + l.name, C.money(l.price * l.qty)]; })
+          .concat([[t("total"), C.money(slip.total)]]),
+        payload);
+    });
+  }
+
   function renderMenuEditor() {
     var box = $("miList");
     box.innerHTML = "";
@@ -715,7 +823,8 @@
       row.className = "mi";
       row.innerHTML = "<div><b>" + esc(m.name) + '</b> <span class="mut">' + esc(m.sku) + "</span><br>" +
         '<small class="mut">' + C.money(m.price) + " · " +
-        (m.tags || []).join(" ") + (m.soldOut ? " · " + t("soldOut") : "") + "</small></div>";
+        (m.tags || []).join(" ") + (m.soldOut ? " · " + t("soldOut") : "") +
+        (m.stock != null ? " · " + m.stock + " " + t("left") : "") + "</small></div>";
       var acts = document.createElement("div");
       acts.className = "acts";
       var bSold = document.createElement("button");
@@ -744,6 +853,12 @@
     else r.top.forEach(function (x) {
       html += '<div class="line"><span>' + esc(x.name) + " &times; " + x.qty + "</span><span>" + C.money(x.revenue) + "</span></div>";
     });
+    if (r.lowStock.length) {
+      html += "<h2>" + t("lowStock") + "</h2>";
+      r.lowStock.forEach(function (x) {
+        html += '<div class="line"><span>' + esc(x.name) + "</span><span>" + x.stock + " " + t("left") + "</span></div>";
+      });
+    }
     $("reportBody").innerHTML = html;
   }
 

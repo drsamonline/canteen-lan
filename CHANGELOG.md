@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.3.0 — 2026-11-01
+
+The four things the last release said it could become, and nothing else.
+
+- **The floor.** Kitchen → *Floor* draws one tile per table: its bill, its open orders,
+  how long the oldest has waited, and any waiter or bill call. Tap a tile and its orders
+  open underneath with the same actions as the list. `Canteen.floorPlan()` is pure, so it
+  is tested with a fixed clock.
+- **Stock, not just sold out.** A dish can carry a count. An order can only be placed as
+  far as the count goes (two lines of the same dish share it), the count comes off as the
+  order goes on the board — so a replay of the same messages lands on the same numbers —
+  and at zero the dish leaves the guest menu while staying on open bills. `stock:set`
+  is the twelfth protocol message; the report names what is running out.
+- **A mirror.** `--mirror host:port` forwards every broadcast to a second host, so the
+  counter keeps running if the laptop dies. Forwarded messages carry `_via` and are never
+  re-forwarded, so two hosts cannot loop at each other. `--mirror-pin` is for a peer that
+  does not share the room's PIN.
+- **The guest's own slip.** *Show my bill* draws the table's bill — itemised, totalled —
+  with a QR the counter can read, and prints it through the same docket path. The encoder
+  moved to `docs/play/qr.js` (UMD, no `Buffer`) so the host and the board draw the same
+  matrix from one file; `scripts/qr-verify.py` still matches the reference 4/4.
+- `/state` carries the menu, so a counter screen can see counts from one call.
+- Tests: 175 → 211, and the host smoke test 21 → 25 (stock over the wire, and a second
+  host kept in step by the mirror).
+
+## 1.2.0 — 2026-11-01
+
 ## 1.2.0 — 2026-11-01
 
 Everything on the "what it could become" list, plus the one thing a canteen asks first:

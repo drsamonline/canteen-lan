@@ -9,6 +9,7 @@
  *     pin: "4821",              // optional: every POST must carry it
  *     journal: "/tmp/room.jsonl",  // optional: the history survives a restart
  *     appDir: "../docs/play",   // optional: serve the app itself from here
+ *     mirror: {host, port, pin},// optional: keep a second host in step
  *     routes: { "/state": (req, res, url) => {...} }
  *   });
  *   const port = await host.listen(0);
@@ -46,6 +47,23 @@ function createHost(opts) {
   const journal = opts.journal || "";
   const appDir = opts.appDir ? path.resolve(opts.appDir) : "";
   const routes = opts.routes || {};
+  const mirror = opts.mirror || null;
+
+  /* A second host on the LAN receives every message this one broadcasts, so the
+     counter keeps running if the first machine dies. `_via` is what stops the
+     two of them forwarding the same message at each other forever. */
+  function mirrorSend(msg) {
+    if (!mirror || !msg || msg._via) return;
+    const body = JSON.stringify(Object.assign({}, msg, { _via: "mirror", pin: mirror.pin || "" }));
+    const req = http.request({
+      host: mirror.host, port: Number(mirror.port) || 8080, path: "/send", method: "POST",
+      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
+      timeout: 3000
+    }, function (res) { res.resume(); });
+    req.on("error", function () { /* a dead mirror must not stop the room */ });
+    req.on("timeout", function () { req.destroy(); });
+    req.end(body);
+  }
 
   /* ---- the journal: history that survives a restart ---- */
 
@@ -81,6 +99,7 @@ function createHost(opts) {
       try { c.write(payload); } catch (e) { clients.delete(c); }
     }
     handlers.forEach(function (h) { try { h(msg); } catch (e) {} });
+    mirrorSend(msg);
   }
 
   /* ---- static: the board is served by the host, so a guest needs no internet ---- */
@@ -169,7 +188,8 @@ function createHost(opts) {
     if (url.pathname === "/" || url.pathname === "/health") {
       if (url.pathname === "/" && appDir) { serveApp(url, res); return; }
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, room: room, clients: clients.size, pin: !!pin }));
+      res.end(JSON.stringify({ ok: true, room: room, clients: clients.size, pin: !!pin,
+        mirror: mirror ? mirror.host + ":" + mirror.port : null }));
       return;
     }
 

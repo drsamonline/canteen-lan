@@ -23,11 +23,11 @@ SLATE = "#3d4650"
 
 BADGES = [
     ("live", "live", "online", GREEN),
-    ("tests", "tests", "175 passing", GREEN),
+    ("tests", "tests", "211 passing", GREEN),
     ("deps", "deps", "0 runtime", SLATE),
     ("offline", "offline", "no network", INK),
     ("licence", "licence", "PolyForm NC 1.0.0", AMBER),
-    ("protocol", "protocol", "11 messages", SLATE),
+    ("protocol", "protocol", "12 messages", SLATE),
 ]
 
 CH = 6.55  # rough advance width of an 11px sans character

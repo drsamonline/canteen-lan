@@ -399,20 +399,111 @@ console.log("Canteen engine " + C.version + " — tests");
   var fs = require("fs");
   var play = path.join(__dirname, "docs", "play");
   var html = fs.readFileSync(path.join(play, "index.html"), "utf8");
-  ["sw.js", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"].forEach(function (f) {
+  ["sw.js", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png", "qr.js"].forEach(function (f) {
     ok("ships " + f, fs.existsSync(path.join(play, f)));
   });
   ok("the app registers the worker", html.indexOf('navigator.serviceWorker.register("sw.js")') !== -1);
   ok("the app links the manifest", html.indexOf('rel="manifest"') !== -1);
   var sw = fs.readFileSync(path.join(play, "sw.js"), "utf8");
   ok("the worker is network-first for html", sw.indexOf("network first") !== -1 && sw.indexOf("isDoc") !== -1);
-  ok("the worker caches every asset it lists", ["index.html", "canteen.js", "lan-kit.js", "web-kit.js"].every(function (f) {
+  ok("the worker caches every asset it lists", ["index.html", "canteen.js", "lan-kit.js", "web-kit.js", "qr.js"].every(function (f) {
     return sw.indexOf('"' + f + '"') !== -1;
   }));
   ok("the cache name carries the release", /canteen-\d+\.\d+\.\d+/.test(sw));
   var man = JSON.parse(fs.readFileSync(path.join(play, "manifest.webmanifest"), "utf8"));
   ok("the manifest starts in the app", man.start_url === "./" && man.icons.length >= 2);
   ok("no external asset in the app page", !/(src|href)="https?:\/\//.test(html));
+})();
+
+/* ---- 25. stock: a count, not a flag ---- */
+(function () {
+  var d = C.newDoc();
+  ok("a new item has no count", C.menuItem(d, "thali").stock === null);
+  C.setStock(d, "thali", 3);
+  ok("a count is kept", C.remainingStock(d, "thali") === 3);
+  ok("a counted item is still on the menu", C.isAvailable(C.menuItem(d, "thali")));
+  ok("an order cannot exceed the count", (function () {
+    var e = C.newDoc(); C.setStock(e, "thali", 2);
+    var items = C.resolveItems(e, [{ sku: "thali", qty: 9 }]);
+    return items.length === 1 && items[0].qty === 2;
+  })());
+  ok("two lines of one dish share the count", (function () {
+    var e = C.newDoc(); C.setStock(e, "thali", 2);
+    var items = C.resolveItems(e, [{ sku: "thali", qty: 2 }, { sku: "thali", qty: 2 }]);
+    return items[0].qty === 2;
+  })());
+  C.apply(d, { t: "order", id: "k1", table: "2", items: [{ sku: "thali", qty: 2 }] });
+  ok("placing an order takes the count down", C.remainingStock(d, "thali") === 1);
+  C.apply(d, { t: "order", id: "k2", table: "2", items: [{ sku: "thali", qty: 5 }] });
+  ok("the last one goes and no more", C.remainingStock(d, "thali") === 0 && d.orders[1].items[0].qty === 1);
+  ok("an empty count is off the guest menu", !C.isAvailable(C.menuItem(d, "thali")));
+  ok("and cannot be ordered at all", C.resolveItems(d, [{ sku: "thali", qty: 1 }]).length === 0);
+  ok("stock:set arrives over the wire", (function () {
+    var e = C.newDoc(); C.apply(e, { t: "stock:set", sku: "thali", stock: 7 });
+    return C.remainingStock(e, "thali") === 7;
+  })());
+  ok("a blank count means unlimited", (function () {
+    var e = C.newDoc(); C.setStock(e, "thali", 5); C.setStock(e, "thali", "");
+    return C.remainingStock(e, "thali") === null && C.isAvailable(C.menuItem(e, "thali"));
+  })());
+  ok("the count is a whole number", C.normStock("2.9") === 2 && C.normStock(-4) === 0 && C.normStock("x") === null);
+  ok("the count survives a snapshot without double-deducting",
+    C.remainingStock(C.fromJSON(C.toJSON(d)), "thali") === 0);
+  ok("a replay of the same messages lands on the same count", (function () {
+    var msgs = [{ t: "stock:set", sku: "thali", stock: 3 },
+                { t: "order", id: "r1", table: "1", items: [{ sku: "thali", qty: 1 }] },
+                { t: "order", id: "r2", table: "1", items: [{ sku: "thali", qty: 1 }] }];
+    return C.remainingStock(C.replay(msgs), "thali") === 1;
+  })());
+  ok("the report names what is running out", (function () {
+    var e = C.newDoc(); C.setStock(e, "thali", 2);
+    var r = C.report(e);
+    return r.lowStock.length === 1 && r.lowStock[0].sku === "thali" && r.lowStock[0].stock === 2;
+  })());
+  ok("stats count what is out of stock", (function () {
+    var e = C.newDoc(); C.setStock(e, "thali", 0);
+    return C.stats(e).outOfStock === 1;
+  })());
+})();
+
+/* ---- 26. the floor: one tile per table ---- */
+(function () {
+  var T = 1767225600000;
+  var d = C.newDoc();
+  C.apply(d, { t: "order", id: "f1", table: "12", ts: T - 8 * 60000, items: [{ sku: "thali", qty: 1 }] });
+  C.apply(d, { t: "order", id: "f2", table: "12", ts: T - 2 * 60000, items: [{ sku: "chai", qty: 1 }] });
+  C.apply(d, { t: "order", id: "f3", table: "4", ts: T - 60000, items: [{ sku: "dosa", qty: 1 }] });
+  C.apply(d, { t: "status", id: "f3", status: "served" });
+  C.apply(d, { t: "call", table: "4", kind: "bill" });
+  var plan = C.floorPlan(d, T);
+  ok("one tile per table", plan.length === 2);
+  ok("tables sort numerically", plan[0].table === "4" && plan[1].table === "12");
+  ok("a tile carries the bill", plan[1].total === 13500);
+  ok("a tile counts its open orders", plan[1].open === 2 && plan[0].open === 0);
+  ok("a tile knows how long the oldest has waited", plan[1].oldest === 8);
+  ok("a tile carries the calls", plan[0].calls.length === 1 && plan[0].calls[0] === "bill");
+  ok("a cancelled order is not on the bill", (function () {
+    var e = C.newDoc();
+    C.apply(e, { t: "order", id: "c1", table: "1", items: [{ sku: "thali", qty: 1 }] });
+    C.apply(e, { t: "cancel", id: "c1" });
+    return C.floorPlan(e, T)[0].total === 0;
+  })());
+})();
+
+/* ---- 27. the guest's slip ---- */
+(function () {
+  var d = C.newDoc();
+  C.apply(d, { t: "order", id: "b1", table: "12", items: [{ sku: "chai", qty: 2 }] });
+  C.apply(d, { t: "order", id: "b2", table: "12", items: [{ sku: "chai", qty: 1 }, { sku: "dosa", qty: 1 }] });
+  C.apply(d, { t: "order", id: "b3", table: "4", items: [{ sku: "thali", qty: 1 }] });
+  C.apply(d, { t: "cancel", id: "b3" });
+  var slip = C.billSlip(d, "12");
+  ok("the slip is one line per dish", slip.lines.length === 2);
+  ok("quantities are merged across orders", slip.lines.filter(function (l) { return l.sku === "chai"; })[0].qty === 3);
+  ok("the slip total is the table's bill", slip.total === 4500 + 6000);
+  ok("the slip names the orders behind it", slip.ids.length === 2 && slip.ids[0] === "b1");
+  ok("a cancelled order is not on the slip", C.billSlip(d, "4").lines.length === 0);
+  ok("an empty table has an empty slip", C.billSlip(d, "99").total === 0);
 })();
 
 /* ---- 15. live: the room transport carries a real order ---- */
@@ -519,6 +610,23 @@ function post(url, obj) {
   ok("the restarted host can rebuild the shift", restarted.orders.length === 1 &&
     C.totalOf(restarted.orders[0]) === 1500);
   await h2.close();
+
+  /* ---- 26. the mirror: a second host stays in step, and does not loop ---- */
+  var hb = createHost({ room: "mirror-b", history: 100, replay: true });
+  var pB = await hb.listen(0);
+  var ha = createHost({ room: "mirror-a", history: 100, replay: true,
+    mirror: { host: "127.0.0.1", port: pB } });
+  var pA = await ha.listen(0);
+  await new Promise(function (r) { setTimeout(r, 100); });
+  await post("http://127.0.0.1:" + pA + "/send", { t: "order", id: "m1", table: "3", items: [{ sku: "chai", qty: 1 }] });
+  await new Promise(function (r) { setTimeout(r, 400); });
+  ok("the mirror receives the order", JSON.stringify(hb.history()).indexOf('"m1"') !== -1);
+  ok("the mirror marks what came from a peer", hb.history().some(function (m) { return m._via === "mirror"; }));
+  ok("the first host keeps one copy", ha.history().filter(function (m) { return m.id === "m1"; }).length === 1);
+  ok("the mirror keeps one copy", hb.history().filter(function (m) { return m.id === "m1"; }).length === 1);
+  ok("the mirror rebuilds the same board", C.replay(hb.history()).orders.length === 1);
+  await ha.close();
+  await hb.close();
 
   /* the journal is a plain JSONL file: no database, nothing to install */
   var lines = fs2.readFileSync(jpath, "utf8").trim().split("\n");

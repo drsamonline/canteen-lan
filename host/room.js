@@ -7,6 +7,7 @@
  *   node host/room.js --pin 4821                 # a stranger on the Wi-Fi is refused
  *   node host/room.js --print 192.168.1.50:9100  # every order prints a KOT
  *   node host/room.js --data .canteen            # where the journal lives
+ *   node host/room.js --mirror 192.168.1.21:8080 # keep a second host in step
  *
  * What the host does:
  *   - serves the board itself at /, so a guest needs no internet and no app store
@@ -37,6 +38,9 @@ const menuFile = arg("menu", "");
 const pin = arg("pin", "");
 const dataDir = path.resolve(arg("data", ".canteen"));
 const printTarget = printer.parseTarget(arg("print", ""));
+const mirrorTarget = printer.parseTarget(arg("mirror", ""));
+/* a mirror of the same room usually shares its PIN; --mirror-pin is for when it does not */
+const mirrorPin = arg("mirror-pin", pin);
 const appDir = path.join(__dirname, "..", "docs", "play");
 const journal = path.join(dataDir, "room-" + room + ".jsonl");
 
@@ -90,12 +94,13 @@ function billText(order) {
 
   const host = createHost({
     room: room, history: 5000, replay: true, pin: pin, journal: journal, appDir: appDir,
+    mirror: mirrorTarget ? { host: mirrorTarget.host, port: mirrorTarget.port, pin: mirrorPin } : null,
     routes: {
       "/state": function (req, res) {
         const st = C.stats(board);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({
-          room: room, stats: st, tables: C.tableTotals(board),
+          room: room, stats: st, tables: C.tableTotals(board), menu: board.menu,
           orders: board.orders, calls: board.calls, report: C.report(board)
         }));
       },
@@ -202,6 +207,7 @@ function billText(order) {
   console.log("  menu:   " + board.menu.length + " item(s)" + (seeded ? " (restored from the journal)" : " (seeded)"));
   console.log("  pin:    " + (pin ? pin : "none"));
   console.log("  print:  " + (printTarget ? printTarget.host + ":" + printTarget.port : "none (browser print only)"));
+  console.log("  mirror: " + (mirrorTarget ? mirrorTarget.host + ":" + mirrorTarget.port : "none"));
   console.log("  journal " + journal);
   lanAddresses().forEach((a) => {
     console.log("  on the LAN (" + a.name + "):  http://" + a.address + ":" + bound + "/");

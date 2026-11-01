@@ -29,12 +29,12 @@ no telemetry, no dependency at runtime.
 ## What it does
 
 A guest picks a table and a name, searches or filters the menu, adds items to a cart that
-survives a reload, and places the order with a note. The kitchen sees every open order
-grouped by table with the running bill and the minutes each has waited, marks one
-*preparing*, *served* or *cancelled*, **undoes** a wrong tap, **splits a table's bill**
-across heads in exact paise, prints a KOT or bill, edits the menu, reads the **shift
-report**, and exports the day as CSV. A guest can call the waiter or ask for the bill, and
-the kitchen acknowledges it.
+survives a reload, and places the order with a note — then taps *Show my bill* for an
+itemised slip with a QR the counter can read. The kitchen sees every open order grouped by
+table with the running bill and the minutes each has waited, or as a **floor** of tiles it
+can tap; marks one *preparing*, *served* or *cancelled*, **undoes** a wrong tap, **splits a
+table's bill** across heads in exact paise, prints a KOT or bill, edits the menu and its
+**stock counts**, reads the **shift report**, and exports the day as CSV.
 
 It keeps working when the Wi-Fi does not: a service worker holds the shell, and anything
 sent while the room is unreachable waits in an outbox and is re-sent on reconnect — with
@@ -65,6 +65,12 @@ was ordered at, so changing the menu never rewrites an old bill; and a sold-out 
 leaves the guest menu while staying on the bills already open. Menu items carry a Hindi
 and Gujarati name where the canteen has one, and the guest's language picks it up.
 
+A dish can also carry a **count** — twelve thalis, not "sold out". An order can only be
+placed as far as the count goes, the count comes off the menu as the order goes on the
+board (so a replay of the same messages lands on the same numbers), and at zero the dish
+leaves the guest menu while staying on open bills. `{ t: "stock:set", sku, stock }` sets
+it; a blank count means unlimited.
+
 ## Run a room
 
 One machine — a laptop, a Pi, anything with Node:
@@ -75,7 +81,12 @@ node host/room.js --pin 4821                 # a stranger on the Wi-Fi is refuse
 node host/room.js --print 192.168.1.50:9100  # every order prints a KOT
 node host/room.js --menu my-menu.json        # seed the menu
 node host/room.js --data .canteen            # where the journal lives
+node host/room.js --mirror 192.168.1.21:8080 # keep a second host in step
 ```
+
+`--mirror` forwards every broadcast to a peer host, so the counter keeps running if the
+laptop dies; forwarded messages are marked and never re-forwarded, so two hosts cannot
+loop at each other. `--mirror-pin` is for a peer that does not share the room's PIN.
 
 It serves the board itself at `/`, prints the LAN address, and draws a QR in the terminal
 for a guest to scan. Also on offer: `/join` (a scannable page), `/qr.svg`, `/state`,
@@ -85,8 +96,8 @@ The journal is `.canteen/room-<room>.jsonl` — one JSON object per message. A r
 replays the shift instead of losing it, and the menu comes back as the kitchen left it.
 
 ```
-node test-node.js             # 175 passed — engine, transport, page
-node scripts/smoke-host.js    # 21 passed — the real host, twice, across a restart
+node test-node.js             # 211 passed — engine, transport, page
+node scripts/smoke-host.js    # 25 passed — the real host, across a restart and a mirror
 ```
 
 No host at all? `docs/play/index.html?solo=1` runs the whole canteen on one device, with
@@ -97,9 +108,10 @@ the board persisted locally.
 The app is thin on purpose, and every part it stands on is **in the repository**:
 
 - `docs/play/canteen.js` — the engine: the board (menu, orders, table calls, audit log) and
-  the eleven-message protocol (`menu`, `menu:set`, `menu:del`, `menu:sold`, `order`,
-  `status`, `cancel`, `undo`, `clear`, `call`, `ack`). Pure, zero-dependency, identical in
-  the browser and under Node, so the whole mechanic is tested headlessly.
+  the twelve-message protocol (`menu`, `menu:set`, `menu:del`, `menu:sold`, `stock:set`,
+  `order`, `status`, `cancel`, `undo`, `clear`, `call`, `ack`), plus the floor plan, the
+  bill slip and the split. Pure, zero-dependency, identical in the browser and under Node,
+  so the whole mechanic is tested headlessly.
 - `docs/play/web-kit.js` — the slice of the shared web-kit the app uses (storage, i18n
   EN/HI/GU, CSV, theme, seo, ui), shipped locally. It used to be *assumed* rather than
   shipped, which meant the page threw before it painted: 78 green engine tests and a dead
@@ -110,16 +122,17 @@ The app is thin on purpose, and every part it stands on is **in the repository**
 - `docs/play/sw.js` + `manifest.webmanifest` — the offline shell: HTML network-first,
   assets cache-first, cache name bumped per release, and a build stamp in the footer so
   "am I on the new one?" is answerable from the page itself.
-- `docs/play/index.html` — the menu, the cart, the join panel, the kitchen, the menu editor
-  and the report.
+- `docs/play/index.html` — the menu, the cart, the join panel, the kitchen, the floor, the
+  menu editor, the report and the guest's slip.
 - `host/lan-host.js` — the room: SSE, POST, a PIN check, a journal, and static serving.
 - `host/room.js` — the canteen host: journal replay, `/join`, `/qr.svg`, `/state`,
   `/report`, `/print`, and a KOT to a thermal printer on every order.
-- `host/qr.js` — a real QR encoder (byte mode, versions 1–4, ECC L): bit stream, Reed–
-  Solomon parity, function patterns, mask chosen by penalty score. `scripts/qr-verify.py`
-  checks the finished matrix module-for-module against the reference `qrcode` library —
-  4/4 exact — because a hand-rolled encoder is exactly the code that looks right and scans
-  wrong.
+- `docs/play/qr.js` — a real QR encoder (byte mode, versions 1–4, ECC L): bit stream,
+  Reed–Solomon parity, function patterns, mask chosen by penalty score. It lives in the app
+  folder because two surfaces need it — the host's join code and the guest's bill slip —
+  and `host/qr.js` is the Node door to the same file. `scripts/qr-verify.py` checks the
+  finished matrix module-for-module against the reference `qrcode` library — 4/4 exact —
+  because a hand-rolled encoder is exactly the code that looks right and scans wrong.
 - `host/print.js` — ESC/POS over a TCP socket, 32 columns, no driver and no CUPS.
 - `scripts/smoke-host.js` — starts `host/room.js` as a real process, drives its routes
   over HTTP, kills it, starts it again and checks the shift and the menu came back.

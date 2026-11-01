@@ -9,11 +9,12 @@
  */
 "use strict";
 
-var CACHE = "canteen-1.2.0";
+var CACHE = "canteen-1.3.0";
 var ASSETS = [
   "./",
   "index.html",
   "canteen.js",
+  "qr.js",
   "lan-kit.js",
   "web-kit.js",
   "manifest.webmanifest",
