@@ -1,18 +1,22 @@
-# Build + release + deploy. One push, one pipeline, all from the same commit.
+# Test + build + release + deploy. One push, one pipeline, all from the same commit.
 #
 # SPDX-FileCopyrightText: 2026 Dr Sohil Momin
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 #
-# This file is intentionally tiny: the whole pipeline lives in the public
-# app-builder kit, so a fix there reaches every app at once. It used to be a
-# 4.9 kB hand-copied workflow, and the copies drifted - one of them kept
-# `if: always()` on the release job, which DELETED the published release before
-# recreating it, so a failed build destroyed the release. Do not inline it again.
+# The build itself lives in the public app-builder kit, so a fix there reaches
+# every app at once. It used to be a 4.9 kB hand-copied workflow, and the copies
+# drifted — one kept `if: always()` on the release job, which DELETED the
+# published release before recreating it, so a failed build destroyed the release.
+# Do not inline it again.
 #
-# What it does on every push to main:
-#   build the portable EXE and the signed APK -> publish the rolling `app-latest`
-#   release -> deploy the demo to Pages. All three come from the same commit, so
-#   the live demo and the released build can never disagree.
+# What runs here:
+#   test  -> node test-node.js. The suite is the only thing standing between a
+#            missing script and a dead page (1.1.0 shipped exactly that), so the
+#            build does not start until it is green.
+#   app   -> the portable EXE and the signed APK -> the rolling `app-latest`
+#            release -> the demo deployed to Pages. All from the same commit.
+#   icon  -> the app icon, attached to the release. A release page with three
+#            bare filenames and no mark is a release nobody recognises.
 #
 # Pull requests build (and are therefore checked) but never release or deploy.
 
@@ -35,7 +39,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    name: The engine, the host and the page
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: node test-node.js
+        run: node test-node.js
+      - name: node scripts/smoke-host.js
+        run: node scripts/smoke-host.js
+
   app:
+    needs: test
     uses: drsamonline/app-builder/.github/workflows/build.yml@246da5d54862d2571b0b37feb10499e467f20d7d   # was @main
     with:
       app_name: canteen-lan
@@ -45,3 +63,17 @@ jobs:
       contents: write
       pages: write
       id-token: write
+
+  icon:
+    name: Attach the app icon to the release
+    needs: app
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: gh release upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload app-latest docs/icon.png#canteen-lan-icon.png --clobber -R "${{ github.repository }}"

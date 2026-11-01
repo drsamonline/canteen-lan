@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.2.0 — 2026-11-01
+
+Everything on the "what it could become" list, plus the one thing a canteen asks first:
+how do I add a dish?
+
+- **The menu is editable.** Kitchen → Menu → add, edit, price, tag, sold-out, delete.
+  Three ways in (`menu:set` / `menu:del` / `menu:sold` by message, `--menu file` at
+  startup, or the board itself), all ending in one message every device applies. A placed
+  order keeps the name and price it was ordered at; a sold-out item leaves the guest menu
+  and stays on open bills. Items carry Hindi and Gujarati names, and tags (veg, jain,
+  spicy, dairy, nuts, fried, gluten-free) drive the guest's filters.
+- **Offline is structural.** `docs/play/sw.js` — HTML network-first, assets cache-first,
+  cache name bumped per release — plus an outbox: a message sent while the room is
+  unreachable is queued and re-sent on reconnect, and order ids are idempotent so a
+  re-send cannot double-charge a table. `manifest.webmanifest` and two PNG icons let the
+  board install to a home screen with no app store.
+- **One device, no host.** `?solo=1` runs the whole canteen with the board persisted in
+  the browser.
+- **The host does more, and needs nothing installed.** It serves the board itself at `/`,
+  journals every message to `.canteen/room-<room>.jsonl` (a restart replays the shift),
+  enforces an optional `--pin`, prints a QR in the terminal and serves `/join`,
+  `/qr.svg`, `/state`, `/report` and `/print`. A static path cannot escape `docs/play/`.
+- **A real QR encoder** (`host/qr.js`): byte mode, versions 1–4, ECC L, Reed–Solomon
+  parity, mask chosen by penalty score. `scripts/qr-verify.py` checks the matrix
+  module-for-module against the reference `qrcode` library — 4/4 exact.
+- **Thermal printing** (`host/print.js`): ESC/POS over TCP 9100, 32 columns, no driver and
+  no CUPS. `--print host:port` sends a KOT on every order; the app also prints a docket
+  through the browser, which works with nothing configured.
+- **Kitchen workflow**: order timers, undo of the last status move, an audit log of who
+  moved what, split a table's bill across heads in exact paise, and a shift report —
+  covers, revenue, average ticket, cancellations, top sellers — printable and exportable.
+- **Guest**: menu search and tag filters, a cart that survives a reload, localised item
+  names, and a 34 px minimum tap target with `aria-live` announcements in the kitchen.
+- **The pipeline tests before it builds.** A `test` job runs `node test-node.js` and the
+  build waits on it; a separate `icon` job attaches `docs/icon.png` to the rolling release,
+  because a release page of three bare filenames is a release nobody recognises.
+- Tests: 97 → 175.
+
+## 1.1.0 — 2026-11-01
+
 ## 1.1.0 — 2026-11-01
 
 - **The app boots again.** `docs/play/` never shipped the web-kit it was built on, so

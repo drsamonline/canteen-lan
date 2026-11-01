@@ -209,7 +209,7 @@
       </div>
       <div class="badges">
         <a href="https://drsamonline.github.io/canteen-lan/"><img src="assets/badge-live.svg" alt="live: online" width="98" height="22"></a>
-        <img src="assets/badge-tests.svg" alt="tests: 97 passing" width="112" height="22">
+        <img src="assets/badge-tests.svg" alt="tests: 175 passing" width="118" height="22">
         <img src="assets/badge-deps.svg" alt="deps: 0 runtime" width="104" height="22">
         <img src="assets/badge-offline.svg" alt="offline: no network" width="118" height="22">
         <img src="assets/badge-licence.svg" alt="licence: PolyForm NC 1.0.0" width="160" height="22">
@@ -239,7 +239,7 @@
     <div class="head"><span class="n">01</span><h2>The board, running</h2><span class="ln"></span></div>
     <p class="lede" style="margin-bottom:22px">This is the app itself in a frame — seeded with a
       shift's worth of orders, with no server behind it. Press the buttons: move an order along,
-      open a table's cart, answer a waiter call.</p>
+      open a table's cart, answer a waiter call, or add a dish to the menu.</p>
 
     <div class="stage">
       <div class="frameBar">
@@ -257,6 +257,7 @@
       <button type="button" data-view="kitchen" aria-pressed="true">Kitchen board</button>
       <button type="button" data-view="guest" aria-pressed="false">Guest menu</button>
       <button type="button" data-view="calls" aria-pressed="false">Calls &amp; tables</button>
+      <button type="button" data-view="menu" aria-pressed="false">Menu editor</button>
       <span class="note">same code as <span class="mono">play/</span> · nothing is sent anywhere</span>
     </div>
   </div>
@@ -269,29 +270,66 @@
       <div class="card">
         <div class="n">GUEST</div>
         <h3>Order from the seat</h3>
-        <p>Pick a table and a name, add items to a cart, add a note like “less spicy”, and place it.
-          The bill for your table stays visible, and you can call the waiter or ask for the bill.</p>
+        <p>Pick a table and a name, search or filter the menu by tag, add items to a cart that
+          survives a reload, and place it with a note. Your table's bill stays visible, and you can
+          call the waiter or ask for the bill.</p>
       </div>
       <div class="card">
         <div class="n">KITCHEN</div>
         <h3>Every table, live</h3>
-        <p>Orders arrive grouped by table with the running bill beside them. Mark one preparing,
-          served or cancelled, acknowledge calls, wipe the served pile at the end of a shift, and
-          export the day as CSV.</p>
+        <p>Orders arrive grouped by table with the running bill and how long each has waited. Mark
+          one preparing, served or cancelled, undo the last move, split a table's bill across heads,
+          edit the menu, read the shift report, print a KOT, and export the day as CSV.</p>
       </div>
       <div class="card">
         <div class="n">ROOM</div>
         <h3>The Wi-Fi is the server</h3>
-        <p>A tiny Node host keeps the board, replays its history to anyone who joins late, and
-          broadcasts over Server-Sent Events. Phones talk back with a plain POST.</p>
+        <p>A tiny Node host serves the board itself, journals every message to a plain file,
+          replays the shift to anyone who joins late or after a restart, and broadcasts over
+          Server-Sent Events. Phones talk back with a plain POST.</p>
       </div>
     </div>
   </div>
 </section>
 
+<section class="band" id="menu">
+  <div class="wrap">
+    <div class="head"><span class="n">03</span><h2>Adding a menu item</h2><span class="ln"></span></div>
+    <p class="lede" style="margin-bottom:22px">Three ways in, and they all end in the same place: one
+      <span class="mono">menu</span> message that every device in the room applies. There is no admin
+      panel to log into, and no database to migrate.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="n">FROM THE KITCHEN</div>
+        <h3>Type it into the board</h3>
+        <p>Kitchen → Menu → name, price in rupees, optional SKU and tags → <b>Save item</b>. It shows
+          up on every phone at once. Edit, sold-out and delete sit on the same row, and every one of
+          those is a single message too.</p>
+      </div>
+      <div class="card">
+        <div class="n">AT STARTUP</div>
+        <h3>Seed it from a file</h3>
+        <p><span class="mono">node host/room.js --menu my-menu.json</span> — an array of
+          <span class="mono">{ "sku", "name", "price", "tags", "names" }</span>, price in paise. Once
+          the room has run, the journal wins, so a kitchen edit is never overwritten by a restart.</p>
+      </div>
+      <div class="card">
+        <div class="n">BY PROTOCOL</div>
+        <h3>One message</h3>
+        <p><span class="mono">{ t: "menu:set", item: {…} }</span>, with
+          <span class="mono">menu:del</span> and <span class="mono">menu:sold</span> beside it. SKUs,
+          prices and tags are re-validated on arrival, so a hostile peer cannot post a ₹1 thali.</p>
+      </div>
+    </div>
+    <p class="fine" style="margin-top:18px">Two rules worth knowing: a placed order keeps the name and
+      price it was ordered at, so editing the menu never rewrites an old bill; and a sold-out item
+      leaves the guest menu while staying on the bills already open.</p>
+  </div>
+</section>
+
 <section class="band">
   <div class="wrap">
-    <div class="head"><span class="n">03</span><h2>What it refuses to do</h2><span class="ln"></span></div>
+    <div class="head"><span class="n">04</span><h2>What it refuses to do</h2><span class="ln"></span></div>
     <ul class="refuse">
       <li>no cloud, no server outside the room</li>
       <li>no accounts, logins or passwords</li>
@@ -301,17 +339,19 @@
       <li>no app store to install it</li>
       <li>no dependency at runtime</li>
       <li>no prices taken from the message — ever</li>
+      <li>no database, no migrations, no backup job</li>
+      <li>no printer driver, no CUPS, no cloud print</li>
     </ul>
   </div>
 </section>
 
 <section class="band">
   <div class="wrap">
-    <div class="head"><span class="n">04</span><h2>The numbers</h2><span class="ln"></span></div>
+    <div class="head"><span class="n">05</span><h2>The numbers</h2><span class="ln"></span></div>
     <div class="nums">
-      <div class="num"><b>97</b><span>tests passing</span></div>
+      <div class="num"><b>175</b><span>tests passing</span></div>
       <div class="num"><b>0</b><span>runtime deps</span></div>
-      <div class="num"><b>7</b><span>protocol messages</span></div>
+      <div class="num"><b>11</b><span>protocol messages</span></div>
       <div class="num"><b>10</b><span>menu items seeded</span></div>
       <div class="num"><b>₹0</b><span>to host a room</span></div>
     </div>
@@ -320,34 +360,42 @@
 
 <section class="band" id="run">
   <div class="wrap">
-    <div class="head"><span class="n">05</span><h2>Run a room</h2><span class="ln"></span></div>
+    <div class="head"><span class="n">06</span><h2>Run a room</h2><span class="ln"></span></div>
     <div class="run">
       <div>
         <pre><span class="c"># on one laptop, Pi — anything with Node</span>
 <span class="k">node</span> host/room.js
 
-<span class="c"># prints the address for the room, e.g.</span>
-<span class="c"># http://192.168.1.20:8080</span></pre>
+<span class="c"># it serves the board itself, prints the</span>
+<span class="c"># address and draws a QR to scan:</span>
+<span class="c"># http://192.168.1.20:8080</span>
+
+<span class="k">node</span> host/room.js <span class="k">--pin</span> 4821
+<span class="k">node</span> host/room.js <span class="k">--print</span> 192.168.1.50:9100
+<span class="k">node</span> host/room.js <span class="k">--menu</span> my-menu.json</pre>
       </div>
       <div>
-        <pre><span class="c"># then, on any phone on the same Wi-Fi</span>
+        <pre><span class="c"># then, on any phone on the same Wi-Fi:</span>
 <span class="k">open</span> http://192.168.1.20:8080
-<span class="c"># or the published board, and paste that</span>
-<span class="c"># address into "Join room"</span>
+<span class="c"># or scan the code at /join, or use the</span>
+<span class="c"># published board and paste the address</span>
+
+<span class="c"># one device, no host at all</span>
+<span class="k">open</span> play/index.html<span class="k">?solo=1</span>
 
 <span class="c"># the whole mechanic, headless</span>
-<span class="k">node</span> test-node.js   <span class="c">→ 97 passed</span></pre>
+<span class="k">node</span> test-node.js   <span class="c">→ 175 passed</span></pre>
       </div>
     </div>
-    <p class="fine" style="margin-top:20px">Override the seeded menu with
-      <span class="mono">--menu my-menu.json</span> — an array of
-      <span class="mono">{ "sku", "name", "price" }</span>, price in paise.</p>
+    <p class="fine" style="margin-top:20px">The journal lives in
+      <span class="mono">.canteen/room-&lt;room&gt;.jsonl</span> — one JSON object per message, so a
+      restart replays the shift and a canteen never loses a bill to a power cut.</p>
   </div>
 </section>
 
 <section class="band">
   <div class="wrap">
-    <div class="head"><span class="n">06</span><h2>Take it with you</h2><span class="ln"></span></div>
+    <div class="head"><span class="n">07</span><h2>Take it with you</h2><span class="ln"></span></div>
     <div class="dl">
       <a href="https://github.com/drsamonline/canteen-lan/releases/download/app-latest/canteen-lan.apk">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 9h12v8.5a1.5 1.5 0 0 1-1.5 1.5h-1v2.2a1.3 1.3 0 0 1-2.6 0V19h-1.8v2.2a1.3 1.3 0 0 1-2.6 0V19h-1A1.5 1.5 0 0 1 6 17.5V9Zm-2.6 0A1.4 1.4 0 0 1 4.8 10.4v5.2a1.4 1.4 0 0 1-2.8 0v-5.2A1.4 1.4 0 0 1 3.4 9Zm17.2 0a1.4 1.4 0 0 1 1.4 1.4v5.2a1.4 1.4 0 0 1-2.8 0v-5.2A1.4 1.4 0 0 1 20.6 9ZM7.4 8a4.7 4.7 0 0 1 9.2 0H7.4Zm2-4.6.9 1.6a.5.5 0 0 1-.9.5l-.9-1.6a.5.5 0 0 1 .9-.5Zm6.3.5-.9 1.6a.5.5 0 0 1-.9-.5l.9-1.6a.5.5 0 0 1 .9.5Z"/></svg>
@@ -365,22 +413,23 @@
     <p class="fine" style="margin-top:16px">Every build comes from the same commit as this page, so
       the demo and the download can never disagree. The board itself is
       <a href="play/" style="color:var(--acc)">one page</a> — nothing to install if you only want to
-      order.</p>
+      order, and it installs to a home screen from the browser's own menu, with no app store in
+      the way.</p>
   </div>
 </section>
 
 <section class="band">
   <div class="wrap">
-    <div class="head"><span class="n">07</span><h2>What it could become</h2><span class="ln"></span></div>
+    <div class="head"><span class="n">08</span><h2>What it could become</h2><span class="ln"></span></div>
     <ul class="next">
-      <li><b>A real offline board</b><span>A service worker so a phone keeps its menu and cart when
-        the Wi-Fi drops mid-order, and re-sends on reconnect.</span></li>
-      <li><b>Print, don't squint</b><span>One-tap KOT and bill slips to a thermal printer on the
-        same LAN — the docket this page draws, on paper.</span></li>
-      <li><b>Split the bill</b><span>Per-head totals on a table, with a share summary the guest can
-        read before paying at the counter.</span></li>
-      <li><b>Shift close</b><span>An end-of-day summary — covers, top sellers, cancellations — from
-        the board's own history, still with no cloud.</span></li>
+      <li><b>A table map</b><span>A floor plan the waiter can tap — the same board, drawn as a grid
+        of seats with their bill and how long they have waited.</span></li>
+      <li><b>Stock, not just sold-out</b><span>Counts that decrement per order and stop at zero, so
+        the last plate of thali cannot be sold twice.</span></li>
+      <li><b>Two rooms, one shift</b><span>Let a host mirror its board to a second device over the
+        LAN, so the counter keeps running if the laptop dies.</span></li>
+      <li><b>Bills in the guest's hand</b><span>The same docket the host prints, shown on the phone
+        as a scannable slip the guest can pay against at the counter.</span></li>
     </ul>
   </div>
 </section>
@@ -434,6 +483,7 @@
   function view(name) {
     var src = name === "guest" ? "play/?demo=1&table=12"
             : name === "calls" ? "play/?demo=1&view=kitchen&tab=calls"
+            : name === "menu" ? "play/?demo=1&view=kitchen&tab=menu"
             : "play/?demo=1&view=kitchen";
     frame.src = src;
     url.textContent = src;
@@ -456,7 +506,7 @@
     });
   }
 
-  document.getElementById("stamp").textContent = "build 1.1.0 · 2026-11-01";
+  document.getElementById("stamp").textContent = "build 1.2.0 · 2026-11-01";
 })();
 </script>
 </body>

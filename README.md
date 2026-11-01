@@ -7,14 +7,15 @@
 [![licence](docs/assets/badge-licence.svg)](LICENSE)
 [![protocol](docs/assets/badge-protocol.svg)](docs/play/canteen.js)
 
-**Order from your table over the room's own Wi-Fi.** One laptop hosts the canteen;
-every phone on the network joins it, orders from its seat, and the kitchen watches
-each table move from *placed* to *served*. No internet, no accounts, no telemetry —
-the orders cross your own LAN and go nowhere else.
+**Order from your table over the room's own Wi-Fi.** One laptop hosts the canteen and
+serves the board itself; every phone on the network joins it, orders from its seat, and
+the kitchen watches each table move from *placed* to *served*. No internet, no accounts,
+no telemetry, no dependency at runtime.
 
 **[Open the board](https://drsamonline.github.io/canteen-lan/play/)** ·
 **[The landing page](https://drsamonline.github.io/canteen-lan/)** ·
 **[Run a room](#run-a-room)** ·
+**[Adding a menu item](#adding-a-menu-item)** ·
 **[Licence](LICENSE)**
 
 <!-- shot:start -->
@@ -23,81 +24,129 @@ the orders cross your own LAN and go nowhere else.
 
 <!-- shot:end -->
 
-![The kitchen board, orders grouped by table](docs/assets/app-desktop.png)
+![The kitchen board, orders grouped by table with the running bill and how long each has waited](docs/assets/app-desktop.png)
 
 ## What it does
 
-A guest picks a table and a name, adds items from the menu to a cart, and places the
-order. The kitchen view lists every open order grouped by table, shows the running
-bill for each table, and can mark an order *preparing*, *served* or *cancelled* — or
-wipe the served pile at the end of a shift. A guest can **call the waiter** or **ask
-for the bill**, and the kitchen acknowledges it. A late joiner is caught up from the
-host's history automatically, and the day exports as CSV.
+A guest picks a table and a name, searches or filters the menu, adds items to a cart that
+survives a reload, and places the order with a note. The kitchen sees every open order
+grouped by table with the running bill and the minutes each has waited, marks one
+*preparing*, *served* or *cancelled*, **undoes** a wrong tap, **splits a table's bill**
+across heads in exact paise, prints a KOT or bill, edits the menu, reads the **shift
+report**, and exports the day as CSV. A guest can call the waiter or ask for the bill, and
+the kitchen acknowledges it.
 
-The landing page embeds the real board in a frame (`play/?demo=1`) seeded with a
-shift's worth of orders, so you can move an order along and answer a call before you
-install anything. The demo runs on the same code as the app, from a pure engine
-function (`Canteen.demoDoc()`) that the tests cover — there is no second demo build.
+It keeps working when the Wi-Fi does not: a service worker holds the shell, and anything
+sent while the room is unreachable waits in an outbox and is re-sent on reconnect — with
+idempotent order ids, so a re-send can never double-charge a table.
+
+The landing page embeds the real board in a frame (`play/?demo=1`) seeded with a shift's
+worth of orders, so you can move an order along, open the menu editor and add a dish
+before you install anything. The demo runs the same code as the app, from a pure engine
+function (`Canteen.demoDoc()`) the tests cover — there is no second demo build.
+
+## Adding a menu item
+
+Three ways in, all ending in one `menu` message every device applies. There is no admin
+panel to log into and no database to migrate.
+
+1. **From the board.** Kitchen → *Menu* → name, price in rupees, optional SKU and tags →
+   *Save item*. It appears on every phone at once. Edit, *Sold out* and *Delete* sit on
+   the same row.
+2. **At startup, from a file.** `node host/room.js --menu my-menu.json` — a JSON array of
+   `{ "sku", "name", "price", "tags", "names" }`, price in **paise**. Once the room has
+   run, the journal wins, so a kitchen edit is never overwritten by a restart.
+3. **By protocol.** `{ t: "menu:set", item: {…} }`, with `menu:del` and `menu:sold`
+   beside it. SKUs, prices and tags are re-validated on arrival, so a hostile peer cannot
+   post a ₹1 thali.
+
+Two rules make it safe to edit a live board: a placed order keeps the name and price it
+was ordered at, so changing the menu never rewrites an old bill; and a sold-out item
+leaves the guest menu while staying on the bills already open. Menu items carry a Hindi
+and Gujarati name where the canteen has one, and the guest's language picks it up.
 
 ## Run a room
 
 One machine — a laptop, a Pi, anything with Node:
 
 ```
-node host/room.js                 # room "canteen", port 8080
+node host/room.js                            # room "canteen", port 8080
+node host/room.js --pin 4821                 # a stranger on the Wi-Fi is refused
+node host/room.js --print 192.168.1.50:9100  # every order prints a KOT
+node host/room.js --menu my-menu.json        # seed the menu
+node host/room.js --data .canteen            # where the journal lives
 ```
 
-It prints the address to use on the LAN, for example `http://192.168.1.20:8080`, and
-seeds the room with the menu so every device sees the same prices. Override the menu
-with `--menu my-menu.json` (a JSON array of `{ "sku", "name", "price" }`, price in
-paise). Guests then open **http://192.168.1.20:8080** on their phone — or the
-published board, and paste that address into *Join room*.
+It serves the board itself at `/`, prints the LAN address, and draws a QR in the terminal
+for a guest to scan. Also on offer: `/join` (a scannable page), `/qr.svg`, `/state`,
+`/report`, and `/print`.
 
-The app also opens straight from `file://` (`docs/play/index.html`): it loads nothing
-it does not ship.
+The journal is `.canteen/room-<room>.jsonl` — one JSON object per message. A restart
+replays the shift instead of losing it, and the menu comes back as the kitchen left it.
 
 ```
-node test-node.js      # 97 passed, 0 failed
+node test-node.js             # 175 passed — engine, transport, page
+node scripts/smoke-host.js    # 21 passed — the real host, twice, across a restart
 ```
+
+No host at all? `docs/play/index.html?solo=1` runs the whole canteen on one device, with
+the board persisted locally.
 
 ## How it is built
 
-The app is thin on purpose, and the parts it stands on are **in the repository**:
+The app is thin on purpose, and every part it stands on is **in the repository**:
 
-- `docs/play/canteen.js` — the engine: the order board (menu, orders, table calls) and
-  the seven-message protocol that keeps every device in step (`menu`, `order`,
-  `status`, `cancel`, `clear`, `call`, `ack`). Pure, zero-dependency, and identical in
+- `docs/play/canteen.js` — the engine: the board (menu, orders, table calls, audit log) and
+  the eleven-message protocol (`menu`, `menu:set`, `menu:del`, `menu:sold`, `order`,
+  `status`, `cancel`, `undo`, `clear`, `call`, `ack`). Pure, zero-dependency, identical in
   the browser and under Node, so the whole mechanic is tested headlessly.
 - `docs/play/web-kit.js` — the slice of the shared web-kit the app uses (storage, i18n
   EN/HI/GU, CSV, theme, seo, ui), shipped locally. It used to be *assumed* rather than
-  shipped, which meant the page threw before it painted: 78 green engine tests and a
-  dead screen. A test now reads `docs/play/index.html` and fails if any script it
-  references is missing or remote.
+  shipped, which meant the page threw before it painted: 78 green engine tests and a dead
+  screen. A test now reads `docs/play/index.html` and fails if any script it references is
+  missing or remote.
 - `docs/play/lan-kit.js` — the room transport: SSE for server→client, plain POST for
-  client→server.
-- `docs/play/index.html` — the menu, the cart, the join panel and the kitchen view.
-- `host/room.js` + `host/lan-host.js` — the tiny zero-dependency room host.
+  client→server, with the optional room PIN riding on every POST.
+- `docs/play/sw.js` + `manifest.webmanifest` — the offline shell: HTML network-first,
+  assets cache-first, cache name bumped per release, and a build stamp in the footer so
+  "am I on the new one?" is answerable from the page itself.
+- `docs/play/index.html` — the menu, the cart, the join panel, the kitchen, the menu editor
+  and the report.
+- `host/lan-host.js` — the room: SSE, POST, a PIN check, a journal, and static serving.
+- `host/room.js` — the canteen host: journal replay, `/join`, `/qr.svg`, `/state`,
+  `/report`, `/print`, and a KOT to a thermal printer on every order.
+- `host/qr.js` — a real QR encoder (byte mode, versions 1–4, ECC L): bit stream, Reed–
+  Solomon parity, function patterns, mask chosen by penalty score. `scripts/qr-verify.py`
+  checks the finished matrix module-for-module against the reference `qrcode` library —
+  4/4 exact — because a hand-rolled encoder is exactly the code that looks right and scans
+  wrong.
+- `host/print.js` — ESC/POS over a TCP socket, 32 columns, no driver and no CUPS.
+- `scripts/smoke-host.js` — starts `host/room.js` as a real process, drives its routes
+  over HTTP, kills it, starts it again and checks the shift and the menu came back.
 
-Every message is sanitised on arrival (SKUs, quantities, tables, statuses and calls are
-validated and clamped) and **prices are taken from the room's menu, never from the
-message**, so a buggy or hostile peer on the LAN cannot mis-price an order or break the
-board. Money is integer paise, so a running bill never drifts.
+Every message is sanitised on arrival (SKUs, quantities, tables, statuses, tags, languages
+and calls are validated and clamped) and **prices are taken from the room's menu, never
+from the message**, so a buggy or hostile peer on the LAN cannot mis-price an order or
+break the board. Money is integer paise, so a running bill never drifts — including a bill
+split seven ways.
 
-The landing page at `docs/index.html` is its own object — a kitchen pass of thermal
-tickets and hairline rules on butcher paper, deliberately unlike the app's rounded,
-warm interface. Its badges are generated locally by `scripts/badges.py`; nothing on
-either surface is fetched from an image service or a CDN.
+The landing page at `docs/index.html` is its own object — a kitchen pass of thermal tickets
+and hairline rules on butcher paper, deliberately unlike the app's rounded, warm interface.
+Its badges are generated locally by `scripts/badges.py`; nothing on either surface is
+fetched from an image service or a CDN.
 
 ## What it refuses to do
 
-No cloud, no accounts, no internet, no telemetry, no CDN or external font, no app
-store, no runtime dependency — and no price that came off the wire.
+No cloud, no accounts, no internet, no telemetry, no CDN or external font, no app store, no
+runtime dependency, no database or migrations, no printer driver — and no price that came
+off the wire.
 
 ## Build the EXE and APK
 
-This repo calls the shared build workflow. On every push, GitHub Actions builds a
-portable Windows EXE and a signed Android APK from `docs/play` and attaches them to the
-`app-latest` release, alongside the Linux binary.
+On every push, GitHub Actions runs the suite, builds a portable Windows EXE and a signed
+Android APK from `docs/play`, publishes them to the `app-latest` release with the app icon
+attached, and deploys the demo to Pages. All from the same commit, so the live demo and the
+download can never disagree.
 
 ## Licence
 

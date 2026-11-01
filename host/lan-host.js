@@ -4,31 +4,118 @@
  * and no WebSocket library: server -> clients over Server-Sent Events, and
  * clients -> server over plain POST. Works on a LAN with no internet.
  *
- *   const host = require("./lan-host.js").createHost({ room: "canteen" });
- *   const port = await host.listen(0);            // 0 = any free port
- *   host.onMessage(m => console.log("got", m));   // observe
- *   host.broadcast({ hello: "room" });            // push to everyone
+ *   const host = require("./lan-host.js").createHost({
+ *     room: "canteen",
+ *     pin: "4821",              // optional: every POST must carry it
+ *     journal: "/tmp/room.jsonl",  // optional: the history survives a restart
+ *     appDir: "../docs/play",   // optional: serve the app itself from here
+ *     routes: { "/state": (req, res, url) => {...} }
+ *   });
+ *   const port = await host.listen(0);
+ *   host.onMessage(m => console.log("got", m));
+ *   host.broadcast({ hello: "room" });
  *
  * PolyForm Noncommercial License 1.0.0. (c) 2026 Dr Sohil Momin.
  */
 "use strict";
 const http = require("http");
+const fs = require("fs");
+const path = require("path");
+
+const MIME = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".ico": "image/x-icon",
+  ".txt": "text/plain; charset=utf-8",
+  ".map": "application/json; charset=utf-8"
+};
 
 function createHost(opts) {
   opts = opts || {};
   const room = opts.room || "default";
+  const pin = opts.pin ? String(opts.pin) : "";
   const clients = new Set();
   const handlers = [];
   const history = [];                 // last N messages, for late joiners
-  const HISTORY_MAX = opts.history === undefined ? 50 : opts.history;
+  const HISTORY_MAX = opts.history === undefined ? 500 : opts.history;
+  const journal = opts.journal || "";
+  const appDir = opts.appDir ? path.resolve(opts.appDir) : "";
+  const routes = opts.routes || {};
+
+  /* ---- the journal: history that survives a restart ---- */
+
+  function journalLoad() {
+    if (!journal) return;
+    let text = "";
+    try { text = fs.readFileSync(journal, "utf8"); } catch (e) { return; }
+    text.split("\n").forEach(function (line) {
+      if (!line.trim()) return;
+      try {
+        const m = JSON.parse(line);
+        history.push(m);
+        if (history.length > HISTORY_MAX) history.shift();
+      } catch (e) { /* a half-written last line is not a reason to refuse to boot */ }
+    });
+  }
+
+  function journalAppend(msg) {
+    if (!journal) return;
+    try {
+      fs.mkdirSync(path.dirname(journal), { recursive: true });
+      fs.appendFileSync(journal, JSON.stringify(msg) + "\n");
+    } catch (e) { /* the room keeps running; the journal is best-effort */ }
+  }
+
+  journalLoad();
 
   function broadcast(msg) {
     if (HISTORY_MAX) { history.push(msg); if (history.length > HISTORY_MAX) history.shift(); }
+    journalAppend(msg);
     const payload = "event: message\ndata: " + JSON.stringify(msg) + "\n\n";
     for (const c of Array.from(clients)) {
       try { c.write(payload); } catch (e) { clients.delete(c); }
     }
     handlers.forEach(function (h) { try { h(msg); } catch (e) {} });
+  }
+
+  /* ---- static: the board is served by the host, so a guest needs no internet ---- */
+
+  function serveFile(res, file) {
+    fs.readFile(file, function (err, buf) {
+      if (err) {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("not found");
+        return;
+      }
+      const ext = path.extname(file).toLowerCase();
+      const isDoc = ext === ".html";
+      res.writeHead(200, {
+        "Content-Type": MIME[ext] || "application/octet-stream",
+        "Content-Length": buf.length,
+        "Cache-Control": isDoc ? "no-cache" : "public, max-age=300",
+        "Service-Worker-Allowed": "/"
+      });
+      res.end(buf);
+    });
+  }
+
+  function serveApp(url, res) {
+    let rel = decodeURIComponent(url.pathname);
+    if (rel === "/" || rel === "") rel = "/index.html";
+    if (rel.endsWith("/")) rel += "index.html";
+    const file = path.join(appDir, rel);
+    /* never let a path escape the app directory */
+    if (!file.startsWith(appDir + path.sep) && file !== path.join(appDir, "index.html")) {
+      res.writeHead(403, { "Content-Type": "text/plain" });
+      res.end("forbidden");
+      return;
+    }
+    serveFile(res, file);
   }
 
   const server = http.createServer(function (req, res) {
@@ -47,7 +134,7 @@ function createHost(opts) {
         "X-Accel-Buffering": "no",
       });
       res.write("retry: 2000\n\n");
-      res.write("event: hello\ndata: " + JSON.stringify({ room: room, clients: clients.size + 1 }) + "\n\n");
+      res.write("event: hello\ndata: " + JSON.stringify({ room: room, pin: !!pin, clients: clients.size + 1 }) + "\n\n");
       if (opts.replay) history.forEach(function (m) { res.write("event: message\ndata: " + JSON.stringify(m) + "\n\n"); });
       clients.add(res);
       const ping = setInterval(function () { try { res.write(": ping\n\n"); } catch (e) {} }, 15000);
@@ -60,7 +147,18 @@ function createHost(opts) {
       req.on("data", function (c) { body += c; if (body.length > 1e6) req.destroy(); });
       req.on("end", function () {
         let msg;
-        try { msg = JSON.parse(body); } catch (e) { msg = { type: "text", text: body }; }
+        try { msg = JSON.parse(body); } catch (e) { msg = null; }
+        if (!msg || typeof msg !== "object") {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: "bad json" }));
+          return;
+        }
+        if (pin && String(msg.pin == null ? "" : msg.pin) !== pin) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: "pin" }));
+          return;
+        }
+        delete msg.pin;                       /* the room never sees the secret */
         broadcast(msg);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, clients: clients.size }));
@@ -69,10 +167,15 @@ function createHost(opts) {
     }
 
     if (url.pathname === "/" || url.pathname === "/health") {
+      if (url.pathname === "/" && appDir) { serveApp(url, res); return; }
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, room: room, clients: clients.size }));
+      res.end(JSON.stringify({ ok: true, room: room, clients: clients.size, pin: !!pin }));
       return;
     }
+
+    if (routes[url.pathname]) { routes[url.pathname](req, res, url); return; }
+
+    if (appDir) { serveApp(url, res); return; }
 
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.end("not found");
@@ -88,6 +191,7 @@ function createHost(opts) {
     broadcast: broadcast,
     onMessage: function (h) { handlers.push(h); },
     clients: function () { return clients.size; },
+    history: function () { return history.slice(); },
     close: function () {
       for (const c of Array.from(clients)) { try { c.end(); } catch (e) {} }
       return new Promise(function (resolve) { server.close(function () { resolve(); }); });

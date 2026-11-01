@@ -176,7 +176,14 @@ console.log("Canteen engine " + C.version + " — tests");
   var live = C.newDoc();
   history.forEach(function (m) { C.apply(live, m); });
   var replayed = C.replay(history);
-  ok("replay matches live apply", C.toJSON(replayed) === C.toJSON(live));
+  /* the audit log stamps wall-clock time, so two runs differ by a millisecond or
+     two; everything else must be identical */
+  var stripTs = function (json) {
+    var o = JSON.parse(json);
+    (o.log || []).forEach(function (e) { e.ts = 0; });
+    return JSON.stringify(o);
+  };
+  ok("replay matches live apply", stripTs(C.toJSON(replayed)) === stripTs(C.toJSON(live)));
   ok("replay kept the cancelled order", C.orderById(replayed, "s1").status === "cancelled");
   ok("replay kept the served order", C.orderById(replayed, "s2").status === "served");
   ok("replay revenue excludes the cancelled order", C.stats(replayed).revenue === 2000);
@@ -204,8 +211,10 @@ console.log("Canteen engine " + C.version + " — tests");
 
 /* ---- 13. the demo board the landing page embeds ---- */
 (function () {
-  var d = C.demoDoc();
-  ok("demoDoc is deterministic", C.toJSON(C.demoDoc()) === C.toJSON(d));
+  var T = 1767225600000;                       /* a fixed clock: the demo carries recent stamps */
+  var d = C.demoDoc(T);
+  ok("demoDoc is deterministic", C.toJSON(C.demoDoc(T)) === C.toJSON(d));
+  ok("the demo orders look recently placed", C.ageMinutes(d.orders[0], T) === 6);
   ok("demo has orders on several tables", d.orders.length === 4 && C.stats(d).tables === 3);
   ok("demo shows every status", ["placed", "preparing", "served"].every(function (s) {
     return d.orders.some(function (o) { return o.status === s; });
@@ -213,6 +222,7 @@ console.log("Canteen engine " + C.version + " — tests");
   ok("demo has a bill and a waiter call", d.calls.length === 2);
   ok("demo revenue is the live bill", C.stats(d).revenue === C.tableTotals(d)["4"] + C.tableTotals(d)["7"] + C.tableTotals(d)["12"]);
   ok("demo survives the snapshot roundtrip", C.toJSON(C.fromJSON(C.toJSON(d))) === C.toJSON(d));
+  ok("a live demo is not stamped in 1970", Math.abs(Date.now() - C.demoDoc().orders[0].ts) < 3600000);
 })();
 
 /* ---- 14. the page ships everything it loads (the bug that shipped a dead app) ---- */
@@ -234,6 +244,175 @@ console.log("Canteen engine " + C.version + " — tests");
     ok("web-kit exposes " + k, new RegExp("Loom\\." + k + "\\s*=").test(webkit));
   });
   ok("web-kit fetches nothing", !/fetch\(|XMLHttpRequest|https?:\/\//.test(webkit));
+})();
+
+/* ---- 16. the menu is editable, and that is the whole point ---- */
+(function () {
+  var d = C.newDoc();
+  var added = C.upsertMenuItem(d, { sku: "misal", name: "Misal pav", price: 7000,
+    tags: ["veg", "spicy"], names: { hi: "\u092e\u093f\u0938\u0933 \u092a\u093e\u0935" } });
+  ok("add an item", !!added && d.menu.length === C.defaultMenu().length + 1);
+  ok("the price is in paise", C.menuItem(d, "misal").price === 7000);
+  ok("tags are kept", C.menuItem(d, "misal").tags.indexOf("spicy") >= 0);
+  ok("the hindi name is kept", C.menuItem(d, "misal").names.hi === "\u092e\u093f\u0938\u0933 \u092a\u093e\u0935");
+  ok("an unknown tag is dropped", C.normTags(["veg", "<script>"]).length === 1);
+  ok("an unknown language is dropped", Object.keys(C.normNames({ hi: "x", xx: "y" })).length === 1);
+  ok("the name falls back to the room name", C.menuItemName(C.menuItem(d, "misal"), "gu") === "Misal pav");
+  ok("the name follows the reader", C.menuItemName(C.menuItem(d, "misal"), "hi") !== "Misal pav");
+  ok("a bad sku is refused", C.upsertMenuItem(d, { sku: "No Spaces", name: "x" }) === null);
+
+  C.upsertMenuItem(d, { sku: "misal", name: "Misal pav (large)", price: 9000 });
+  ok("editing replaces, not appends", d.menu.length === C.defaultMenu().length + 1 &&
+    C.menuItem(d, "misal").price === 9000);
+
+  C.setSoldOut(d, "misal", true);
+  ok("sold out leaves the guest menu", C.availableMenu(d).every(function (m) { return m.sku !== "misal"; }));
+  ok("a sold-out sku cannot be ordered", C.resolveItems(d, [{ sku: "misal", qty: 1 }]).length === 0);
+  ok("sold out keeps the item on the board", !!C.menuItem(d, "misal"));
+  C.setSoldOut(d, "misal", false);
+  ok("back on sale", C.resolveItems(d, [{ sku: "misal", qty: 1 }]).length === 1);
+
+  C.removeMenuItem(d, "misal");
+  ok("delete removes it", !C.menuItem(d, "misal"));
+
+  ok("search by tag", C.searchMenu(d, "", { tag: "spicy" }).length >= 1);
+  ok("search by a hindi name", C.searchMenu(d, "\u0921\u094b\u0938\u093e").length === 1);
+  ok("search by sku", C.searchMenu(d, "thali")[0].sku === "thali");
+  ok("menu edits are logged", d.log.some(function (e) { return e.kind === "menu:set"; }));
+  ok("a menu edit reaches every client as one message", (function () {
+    var room = C.newDoc();
+    C.apply(room, { t: "menu:set", item: { sku: "misal", name: "Misal pav", price: 7000 } });
+    return room.menu.length === C.defaultMenu().length + 1;
+  })());
+})();
+
+/* ---- 17. a bill split across heads adds up to the bill ---- */
+(function () {
+  var d = C.newDoc();
+  C.apply(d, { t: "order", id: "s1", table: "5", items: [{ sku: "thali", qty: 1 }] });
+  C.apply(d, { t: "order", id: "s2", table: "5", items: [{ sku: "chai", qty: 1 }] });
+  ok("one head takes it all", C.splitBill(d, "5", 1).shares[0] === 13500);
+  var seven = C.splitBill(d, "5", 7);
+  ok("seven heads sum exactly", seven.shares.reduce(function (a, b) { return a + b; }, 0) === 13500);
+  ok("no two shares differ by more than a paisa",
+    Math.max.apply(null, seven.shares) - Math.min.apply(null, seven.shares) <= 1);
+  ok("the paise remainder is handed out", seven.shares.join(",") === "1929,1929,1929,1929,1928,1928,1928");
+  ok("heads are clamped", C.splitBill(d, "5", 0).heads === 1 && C.splitBill(d, "5", 999).heads === 50);
+  ok("a cancelled order leaves the split", (function () {
+    C.apply(d, { t: "cancel", id: "s1" });
+    return C.splitBill(d, "5", 2).total === 1500;
+  })());
+})();
+
+/* ---- 18. the shift report ---- */
+(function () {
+  var d = C.newDoc();
+  C.apply(d, { t: "order", id: "r1", table: "1", items: [{ sku: "chai", qty: 2 }] });
+  C.apply(d, { t: "order", id: "r2", table: "2", items: [{ sku: "chai", qty: 1 }, { sku: "thali", qty: 1 }] });
+  C.apply(d, { t: "order", id: "r3", table: "3", items: [{ sku: "dosa", qty: 1 }] });
+  C.apply(d, { t: "cancel", id: "r3" });
+  var r = C.report(d);
+  ok("covers exclude cancellations", r.covers === 2 && r.orders === 3 && r.cancelled === 1);
+  ok("revenue excludes cancellations", r.revenue === 3000 + 13500);
+  ok("the average ticket is per cover", r.average === Math.round(16500 / 2));
+  ok("top sellers are ranked by quantity", r.top[0].sku === "chai" && r.top[0].qty === 3);
+  ok("top sellers carry revenue", r.top[0].revenue === 4500);
+})();
+
+/* ---- 19. the log, and undo ---- */
+(function () {
+  var d = C.newDoc();
+  C.apply(d, { t: "order", id: "u1", table: "8", items: [{ sku: "idli", qty: 1 }] });
+  C.apply(d, { t: "status", id: "u1", status: "preparing", by: "ravi" });
+  C.apply(d, { t: "status", id: "u1", status: "served", by: "ravi" });
+  ok("every move is logged with who did it", d.log.filter(function (e) { return e.kind === "status"; }).length === 2 &&
+    d.log[d.log.length - 1].by === "ravi");
+  ok("undo steps back one move", (C.undoLast(d), C.orderById(d, "u1").status === "preparing"));
+  ok("undo again steps back to placed", (C.undoLast(d), C.orderById(d, "u1").status === "placed"));
+  ok("nothing left to undo", C.undoLast(d) === null);
+  ok("a status that does not change is not logged", (function () {
+    var before = d.log.length;
+    C.apply(d, { t: "status", id: "u1", status: "placed" });
+    return d.log.length === before;
+  })());
+  ok("a cleared pile is not undoable", (function () {
+    var e = C.newDoc();
+    C.apply(e, { t: "order", id: "c1", table: "1", items: [{ sku: "chai", qty: 1 }] });
+    C.apply(e, { t: "status", id: "c1", status: "served" });
+    C.apply(e, { t: "clear" });
+    return e.orders.length === 0 && C.undoLast(e) === null;
+  })());
+  ok("the log survives a snapshot", C.toJSON(C.fromJSON(C.toJSON(d))).length > 0 &&
+    C.logOf(C.fromJSON(C.toJSON(d)), 1).length === 1);
+})();
+
+/* ---- 20. a reconnected device cannot double-charge a table ---- */
+(function () {
+  var d = C.newDoc();
+  var msg = { t: "order", id: "dup1", table: "9", items: [{ sku: "thali", qty: 1 }] };
+  C.apply(d, msg); C.apply(d, msg); C.apply(d, msg);
+  ok("the same order id lands once", d.orders.length === 1 && C.stats(d).revenue === 12000);
+})();
+
+/* ---- 21. how long an order has been waiting ---- */
+(function () {
+  var o = C.newOrder({ ts: 1000000 });
+  ok("age in whole minutes", C.ageMinutes(o, 1000000 + 5 * 60000 + 30000) === 5);
+  ok("an order with no timestamp has no age", C.ageMinutes(C.newOrder({}), Date.now()) === null);
+})();
+
+/* ---- 22. the QR the host prints ---- */
+(function () {
+  var q = require(path.join(__dirname, "host", "qr.js"));
+  var r = q.encode("http://192.168.1.20:8080");
+  ok("a join address fits version 2", r.version === 2 && r.size === 25);
+  ok("the mask is one of the eight", r.mask >= 0 && r.mask <= 7);
+  var far = r.size - 7;
+  ok("three finder patterns are drawn", [[0, 0], [far, 0], [0, far]].every(function (c) {
+    return r.modules[c[1]][c[0]] && r.modules[c[1] + 1][c[0] + 1] === false && r.modules[c[1] + 2][c[0] + 2];
+  }));
+  ok("the dark module is set", r.modules[r.size - 8][8] === true);
+  ok("encoding is deterministic", JSON.stringify(q.encode("http://192.168.1.20:8080").modules) === JSON.stringify(r.modules));
+  ok("a long address moves up a version", q.encode("http://192.168.100.244:3000/play/?room=canteen").version === 3);
+  ok("svg output", q.toSVG("http://192.168.1.20:8080").indexOf("<svg") === 0);
+  ok("terminal output has rows", q.toText("http://192.168.1.20:8080", { border: 1 }).split("\n").length === 27);
+})();
+
+/* ---- 23. the thermal docket ---- */
+(function () {
+  var pr = require(path.join(__dirname, "host", "print.js"));
+  var text = pr.docket({ title: "KOT  table 12", lines: [["2 x Masala chai", "Rs 30.00"]], foot: "Aarti" });
+  ok("the docket has a title", text.indexOf("KOT  TABLE 12") === 0 || text.indexOf("KOT  TABLE 12") >= 0);
+  ok("lines are column-aligned to 32", text.split("\n").every(function (l) { return l.length <= 32; }));
+  ok("esc/pos init and cut", (function () {
+    var b = pr.encode(text);
+    return b.slice(0, 2).toString("latin1") === "\x1b@" && b.slice(-3).toString("latin1") === "\x1dV\x00";
+  })());
+  ok("a printer target parses", (function () {
+    var t = pr.parseTarget("192.168.1.50:9100");
+    return t.host === "192.168.1.50" && t.port === 9100;
+  })());
+})();
+
+/* ---- 24. the page ships everything it loads ---- */
+(function () {
+  var fs = require("fs");
+  var play = path.join(__dirname, "docs", "play");
+  var html = fs.readFileSync(path.join(play, "index.html"), "utf8");
+  ["sw.js", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"].forEach(function (f) {
+    ok("ships " + f, fs.existsSync(path.join(play, f)));
+  });
+  ok("the app registers the worker", html.indexOf('navigator.serviceWorker.register("sw.js")') !== -1);
+  ok("the app links the manifest", html.indexOf('rel="manifest"') !== -1);
+  var sw = fs.readFileSync(path.join(play, "sw.js"), "utf8");
+  ok("the worker is network-first for html", sw.indexOf("network first") !== -1 && sw.indexOf("isDoc") !== -1);
+  ok("the worker caches every asset it lists", ["index.html", "canteen.js", "lan-kit.js", "web-kit.js"].every(function (f) {
+    return sw.indexOf('"' + f + '"') !== -1;
+  }));
+  ok("the cache name carries the release", /canteen-\d+\.\d+\.\d+/.test(sw));
+  var man = JSON.parse(fs.readFileSync(path.join(play, "manifest.webmanifest"), "utf8"));
+  ok("the manifest starts in the app", man.start_url === "./" && man.icons.length >= 2);
+  ok("no external asset in the app page", !/(src|href)="https?:\/\//.test(html));
 })();
 
 /* ---- 15. live: the room transport carries a real order ---- */
@@ -292,6 +471,61 @@ function post(url, obj) {
 
   await host.close();
   ok("host closes cleanly", true);
+
+  /* ---- 25. the host: the pin, the journal, and serving the board itself ---- */
+  var fs2 = require("fs");
+  var os2 = require("os");
+  var tmp = fs2.mkdtempSync(path.join(os2.tmpdir(), "canteen-"));
+  var jpath = path.join(tmp, "room.jsonl");
+  var play = path.join(__dirname, "docs", "play");
+
+  var h1 = createHost({ room: "pin-test", pin: "4821", journal: jpath, appDir: play, history: 100, replay: true });
+  var p1 = await h1.listen(0);
+  var base1 = "http://127.0.0.1:" + p1;
+
+  var pageRes = await new Promise(function (resolve) {
+    http.get(base1 + "/", function (r) { var b = ""; r.on("data", function (c) { b += c; }); r.on("end", function () { resolve({ status: r.statusCode, body: b, type: r.headers["content-type"] }); }); });
+  });
+  ok("the host serves the board itself", pageRes.status === 200 && pageRes.body.indexOf("Canteen") !== -1 &&
+    /text\/html/.test(pageRes.type || ""));
+  var jsRes = await new Promise(function (resolve) {
+    http.get(base1 + "/canteen.js", function (r) { var b = ""; r.on("data", function (c) { b += c; }); r.on("end", function () { resolve({ status: r.statusCode, type: r.headers["content-type"] }); }); });
+  });
+  ok("the host serves the engine with a js type", jsRes.status === 200 && /javascript/.test(jsRes.type || ""));
+  var escapeRes = await new Promise(function (resolve) {
+    http.get(base1 + "/../host/room.js", function (r) { resolve({ status: r.statusCode }); });
+  });
+  ok("a path cannot escape the app directory", escapeRes.status === 403 || escapeRes.status === 404);
+
+  var noPin = await post(base1 + "/send", { t: "order", id: "x1", table: "1", items: [{ sku: "chai", qty: 1 }] });
+  ok("without the pin the room refuses", noPin.status === 403);
+  var wrongPin = await post(base1 + "/send", { t: "order", id: "x1", table: "1", pin: "0000", items: [{ sku: "chai", qty: 1 }] });
+  ok("a wrong pin is refused", wrongPin.status === 403);
+  var withPin = await post(base1 + "/send", { t: "order", id: "x1", table: "1", pin: "4821", items: [{ sku: "chai", qty: 1 }] });
+  ok("with the pin it is accepted", withPin.status === 200 && JSON.parse(withPin.body).ok === true);
+  ok("the pin never reaches the room", JSON.stringify(h1.history()).indexOf("4821") === -1);
+
+  var health1 = await new Promise(function (res) {
+    http.get(base1 + "/health", function (x) { var b = ""; x.on("data", function (c) { b += c; }); x.on("end", function () { res(JSON.parse(b)); }); });
+  });
+  ok("health reports that the room has a pin", health1.pin === true && health1.room === "pin-test");
+
+  await h1.close();
+
+  var h2 = createHost({ room: "pin-test", journal: jpath, appDir: play, history: 100, replay: true });
+  ok("the journal survives a restart", h2.history().length >= 1 &&
+    JSON.stringify(h2.history()).indexOf('"x1"') !== -1);
+  var restarted = C.replay(h2.history());
+  ok("the restarted host can rebuild the shift", restarted.orders.length === 1 &&
+    C.totalOf(restarted.orders[0]) === 1500);
+  await h2.close();
+
+  /* the journal is a plain JSONL file: no database, nothing to install */
+  var lines = fs2.readFileSync(jpath, "utf8").trim().split("\n");
+  ok("the journal is one JSON object per line", lines.length >= 1 && lines.every(function (l) {
+    try { return !!JSON.parse(l); } catch (e) { return false; }
+  }));
+  fs2.rmSync(tmp, { recursive: true, force: true });
 
   console.log("\n" + pass + " passed, " + fail + " failed");
   process.exit(fail ? 1 : 0);

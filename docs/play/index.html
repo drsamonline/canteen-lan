@@ -6,8 +6,10 @@
 <title>Canteen — order from your table</title>
 <meta name="description" content="Order from your table over the room's own Wi-Fi. No accounts, no internet, no telemetry.">
 <meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <style>
-  :root{--bg:#0f1115;--card:#171a21;--ink:#e7e9ee;--mut:#9aa3b2;--line:#252a34;--acc:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+  :root{--bg:#0f1115;--card:#171a21;--ink:#e7e9ee;--mut:#9aa3b2;--line:#252a34;--acc:#22c55e;--warn:#f59e0b;--bad:#ef4444;--info:#38bdf8}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
   header,main,footer{max-width:900px;margin:0 auto;padding:16px 20px}
@@ -20,40 +22,56 @@
   button,select,input,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
   button{cursor:pointer}
   button.primary{background:var(--acc);color:#06210f;border-color:var(--acc);font-weight:700}
-  button.sm{padding:5px 9px;font-size:13px}
+  button.sm{padding:6px 11px;font-size:13px;min-height:34px}
   button.ghost{background:transparent}
+  button.danger{color:var(--bad);border-color:var(--bad);background:transparent}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
   .grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
   .item{display:flex;justify-content:space-between;align-items:center;gap:8px}
   .item b{font-weight:600;font-size:14px}
   .item small{color:var(--mut)}
   .qty{display:flex;align-items:center;gap:6px}
-  .qty button{width:30px;text-align:center;padding:4px 0}
+  .qty button{width:34px;text-align:center;padding:5px 0;min-height:34px}
   .mut{color:var(--mut)}
   .pill{display:inline-block;font-size:12px;border-radius:999px;padding:2px 9px;border:1px solid var(--line)}
   .s-placed{color:var(--warn);border-color:var(--warn)}
-  .s-preparing{color:#38bdf8;border-color:#38bdf8}
+  .s-preparing{color:var(--info);border-color:var(--info)}
   .s-served{color:var(--acc);border-color:var(--acc)}
   .s-cancelled{color:var(--bad);border-color:var(--bad);text-decoration:line-through}
+  .tag{font-size:11px;border-radius:999px;padding:1px 7px;border:1px solid var(--line);color:var(--mut);margin-right:4px}
+  .tag.on{color:var(--acc);border-color:var(--acc)}
   .dot{width:9px;height:9px;border-radius:50%;background:var(--mut);display:inline-block}
   .dot.on{background:var(--acc)}
-  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+  .dot.warn{background:var(--warn)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px}
   .stats .card b{display:block;font-size:22px}
   .line{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px dashed var(--line)}
   .line:last-child{border-bottom:0}
-  .table-h{display:flex;justify-content:space-between;align-items:center;margin:16px 0 6px}
+  .table-h{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:16px 0 6px;flex-wrap:wrap}
   .order{border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0}
-  .order .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .order .top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
   .empty{color:var(--mut);font-style:italic}
+  .sold{opacity:.55}
+  .sold b{text-decoration:line-through}
   footer{color:var(--mut);font-size:13px;border-top:1px solid var(--line);margin-top:30px}
   [hidden]{display:none!important}
   .demobar{max-width:900px;margin:12px auto 0;padding:9px 14px;border:1px dashed var(--warn);border-radius:10px;
     color:var(--warn);font-size:13px;line-height:1.5}
+  .demobar.off{border-color:var(--info);color:var(--info)}
   label{font-size:13px;color:var(--mut);display:block;margin-bottom:3px}
-  /* the join row is a flex pair with a fixed-width table cell; without this the
-     native input width (20 chars) overflows the card on a wide screen */
   #join .row>div{min-width:0}
   #join input{width:100%}
+  .tabs button{border-radius:999px}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .mi{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .mi:last-child{border-bottom:0}
+  .mi .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  @media(max-width:620px){.mi{grid-template-columns:1fr;gap:6px}.mi .acts{justify-content:flex-start}}
+  .form{display:grid;grid-template-columns:1.4fr .7fr .7fr;gap:8px;align-items:end}
+  @media(max-width:620px){.form{grid-template-columns:1fr}}
+  .tags{display:flex;flex-wrap:wrap;gap:6px}
+  .tags button{font-size:12px;padding:5px 10px;border-radius:999px;background:transparent;color:var(--mut)}
+  .tags button.on{color:var(--acc);border-color:var(--acc)}
 </style>
 </head>
 <body>
@@ -62,6 +80,7 @@
   <div class="row">
     <span id="status" class="mut"><span class="dot"></span> <span id="statusText"></span></span>
     <select id="lang" aria-label="Language"></select>
+    <button id="sound" class="ghost sm" title="Alert sound" aria-pressed="false">♪</button>
     <button id="theme" class="ghost sm" title="Theme">◐</button>
     <button id="viewBtn" class="sm">Kitchen</button>
   </div>
@@ -74,19 +93,29 @@
     <h2 id="joinH"></h2>
     <div class="card">
       <div class="row">
-        <div class="grow"><label id="lName"></label><input id="name" placeholder="Aarti"></div>
-        <div style="width:110px"><label id="lTable"></label><input id="table" placeholder="12"></div>
+        <div class="grow"><label id="lName"></label><input id="name" placeholder="Aarti" autocomplete="name"></div>
+        <div style="width:110px"><label id="lTable"></label><input id="table" placeholder="12" inputmode="numeric"></div>
       </div>
-      <div style="margin-top:10px"><label id="lHost"></label><input id="host" placeholder="http://192.168.1.20:8080"></div>
+      <div class="row" style="margin-top:10px">
+        <div class="grow"><label id="lHost"></label><input id="host" placeholder="http://192.168.1.20:8080" inputmode="url"></div>
+        <div style="width:110px"><label id="lPin"></label><input id="pin" placeholder="—" inputmode="numeric" autocomplete="off"></div>
+      </div>
       <div class="row" style="margin-top:12px">
         <button id="joinBtn" class="primary"></button>
+        <button id="soloBtn" class="ghost sm"></button>
         <span id="joinMsg" class="mut"></span>
       </div>
+      <p class="mut" style="font-size:12.5px;margin:10px 0 0" id="joinHint"></p>
     </div>
   </section>
 
   <section id="app" hidden>
     <div id="guest">
+      <div class="row" style="margin:4px 0 6px">
+        <input id="search" class="grow" placeholder="" aria-label="Search the menu">
+      </div>
+      <div class="tags" id="filters"></div>
+
       <h2 id="hMenu"></h2>
       <div id="menu" class="grid"></div>
 
@@ -110,15 +139,49 @@
     <div id="kitchen" hidden>
       <h2 id="hKitchen"></h2>
       <div id="kstats" class="stats"></div>
-      <div class="row" style="margin-top:14px">
+
+      <div class="row tabs" style="margin-top:14px">
         <button id="tabOrders" class="primary sm"></button>
         <button id="tabCalls" class="ghost sm"></button>
-        <span class="grow"></span>
-        <button id="exportBtn" class="sm"></button>
-        <button id="clearBtn" class="sm"></button>
+        <button id="tabMenu" class="ghost sm"></button>
+        <button id="tabReport" class="ghost sm"></button>
       </div>
-      <div id="korders" style="margin-top:6px"></div>
-      <div id="kcalls" style="margin-top:6px" hidden></div>
+
+      <div id="korders" style="margin-top:8px">
+        <div class="row" style="margin-bottom:6px">
+          <button id="undoBtn" class="sm ghost"></button>
+          <span class="grow"></span>
+          <button id="exportBtn" class="sm"></button>
+          <button id="clearBtn" class="sm"></button>
+        </div>
+        <div id="klist"></div>
+      </div>
+
+      <div id="kcalls" style="margin-top:8px" hidden></div>
+
+      <div id="kmenu" style="margin-top:8px" hidden>
+        <div class="card" style="margin-bottom:12px">
+          <div class="form">
+            <div><label id="lItemName"></label><input id="miName" placeholder="Poha"></div>
+            <div><label id="lItemPrice"></label><input id="miPrice" placeholder="35" inputmode="decimal"></div>
+            <div><label id="lItemSku"></label><input id="miSku" placeholder="poha"></div>
+          </div>
+          <div class="tags" id="miTags" style="margin-top:10px"></div>
+          <div class="row" style="margin-top:10px">
+            <button id="miSave" class="primary sm"></button>
+            <button id="miReset" class="ghost sm"></button>
+            <span id="miMsg" class="mut" style="font-size:12.5px"></span>
+          </div>
+        </div>
+        <div class="card" id="miList"></div>
+      </div>
+
+      <div id="kreport" style="margin-top:8px" hidden>
+        <div class="card" id="reportBody"></div>
+        <div class="row" style="margin-top:10px">
+          <button id="printReport" class="sm"></button>
+        </div>
+      </div>
     </div>
   </section>
 </main>
@@ -127,6 +190,9 @@
   Built with Forge · web-kit + lan-kit · offline, no accounts · © 2026 Dr Sohil Momin
   · <span id="build"></span>
 </footer>
+
+<div class="sr" id="live" role="status" aria-live="polite"></div>
+<div id="printArea"></div>
 
 <script src="web-kit.js"></script>
 <script src="lan-kit.js"></script>
@@ -140,35 +206,70 @@
   /* ---- app strings, on top of web-kit's built-ins ---- */
   var S = {
     en: { tag: "order from your table", join: "Join room", name: "Your name", table: "Table",
-          host: "Host address (printed by the room host)", menu: "Menu", cart: "Your order",
+          host: "Host address", pin: "Room PIN", menu: "Menu", cart: "Your order",
           note: "Note (optional, e.g. less spicy)", place: "Place order", yourtable: "At your table",
           waiter: "Call waiter", bill: "Request bill", kitchen: "Kitchen", guest: "Order",
           orders: "Orders", calls: "Calls", clear: "Clear served", export: "Export CSV",
           placed: "Placed", preparing: "Preparing", served: "Served", cancelled: "Cancelled",
-          done: "Done", total: "Total", empty: "Nothing yet.", preview: "Not joined — preview menu.",
+          done: "Done", total: "Total", empty: "Nothing yet.",
           connected: "Connected", connecting: "Connecting…", off: "Not connected",
-          revenue: "Revenue", open: "Open", tables: "Tables", waiterCall: "Waiter called", billCall: "Bill requested",
-          prep: "Preparing", serve: "Served", cancel: "Cancel", items: "Items" },
+          revenue: "Revenue", open: "Open", tables: "Tables", waiterCall: "Waiter called",
+          billCall: "Bill requested", prep: "Preparing", serve: "Served", cancel: "Cancel",
+          items: "Items", solo: "This device only", search: "Search the menu — name, tag, sku",
+          all: "All", soldOut: "Sold out", soldOutShort: "out", menuTab: "Menu", report: "Shift report",
+          addItem: "Add item", save: "Save item", reset: "Clear form", price: "Price (₹)", sku: "SKU (optional)",
+          itemName: "Item name", undo: "Undo last move", split: "Split bill", heads: "heads",
+          each: "each", covers: "Covers", average: "Average ticket", topItems: "Top sellers",
+          printReport: "Print report", sound: "Sound", queued: "queued",
+          newOrder: "New order", minutes: "min", edit: "Edit", del: "Delete", avail: "Available",
+          printerOff: "No printer on the room host — this prints through your browser.",
+          soloHint: "One device runs the whole canteen. Nothing leaves this phone or laptop.",
+          joinHint: "The host prints this address when it starts. Leave the PIN empty if the room has none.",
+          menuHint: "Changes go to every device in the room at once. A sold-out item stays on bills already placed." },
     hi: { tag: "अपनी मेज़ से ऑर्डर करें", join: "कमरे में जुड़ें", name: "आपका नाम", table: "मेज़",
-          host: "होस्ट पता (रूम होस्ट द्वारा दिखाया गया)", menu: "मेन्यू", cart: "आपका ऑर्डर",
+          host: "होस्ट पता", pin: "रूम पिन", menu: "मेन्यू", cart: "आपका ऑर्डर",
           note: "टिप्पणी (वैकल्पिक)", place: "ऑर्डर दें", yourtable: "आपकी मेज़ पर",
           waiter: "वेटर बुलाएँ", bill: "बिल माँगें", kitchen: "रसोई", guest: "ऑर्डर",
           orders: "ऑर्डर", calls: "कॉल", clear: "परोसे हुए हटाएँ", export: "CSV निर्यात करें",
           placed: "दिया गया", preparing: "बन रहा है", served: "परोसा गया", cancelled: "रद्द",
-          done: "हो गया", total: "कुल", empty: "अभी कुछ नहीं।", preview: "जुड़े नहीं — पूर्वावलोकन मेन्यू।",
+          done: "हो गया", total: "कुल", empty: "अभी कुछ नहीं।",
           connected: "जुड़ गया", connecting: "जुड़ रहा है…", off: "जुड़ा नहीं",
-          revenue: "कुल बिक्री", open: "बाकी", tables: "मेज़ें", waiterCall: "वेटर बुलाया", billCall: "बिल माँगा",
-          prep: "बनाएँ", serve: "परोसें", cancel: "रद्द करें", items: "वस्तुएँ" },
+          revenue: "कुल बिक्री", open: "बाकी", tables: "मेज़ें", waiterCall: "वेटर बुलाया",
+          billCall: "बिल माँगा", prep: "बनाएँ", serve: "परोसें", cancel: "रद्द करें",
+          items: "वस्तुएँ", solo: "केवल यह डिवाइस", search: "मेन्यू खोजें", all: "सब",
+          soldOut: "खत्म", soldOutShort: "खत्म", menuTab: "मेन्यू", report: "शिफ्ट रिपोर्ट",
+          addItem: "वस्तु जोड़ें", save: "सहेजें", reset: "फ़ॉर्म खाली करें", price: "कीमत (₹)",
+          sku: "एसकेयू (वैकल्पिक)", itemName: "वस्तु का नाम", undo: "पिछला बदलाव हटाएँ",
+          split: "बिल बाँटें", heads: "लोग", each: "प्रति व्यक्ति", covers: "ग्राहक",
+          average: "औसत बिल", topItems: "सबसे ज़्यादा बिके", printReport: "रिपोर्ट छापें",
+          sound: "आवाज़", queued: "कतार में", newOrder: "नया ऑर्डर", minutes: "मिनट",
+          edit: "बदलें", del: "हटाएँ", avail: "उपलब्ध",
+          printerOff: "रूम होस्ट पर प्रिंटर नहीं — ब्राउज़र से छपेगा।",
+          soloHint: "एक ही डिवाइस पूरी कैंटीन चलाए। कुछ भी बाहर नहीं जाता।",
+          joinHint: "होस्ट शुरू होने पर यह पता दिखाता है। पिन खाली छोड़ें अगर रूम में नहीं है।",
+          menuHint: "बदलाव तुरंत सभी डिवाइस पर जाते हैं। खत्म वस्तु पहले दिए बिलों पर रहती है।" },
     gu: { tag: "તમારા ટેબલથી ઓર્ડર કરો", join: "રૂમમાં જોડાઓ", name: "તમારું નામ", table: "ટેબલ",
-          host: "હોસ્ટ સરનામું (રૂમ હોસ્ટ દ્વારા બતાવેલ)", menu: "મેનૂ", cart: "તમારો ઓર્ડર",
+          host: "હોસ્ટ સરનામું", pin: "રૂમ પિન", menu: "મેનૂ", cart: "તમારો ઓર્ડર",
           note: "નોંધ (વૈકલ્પિક)", place: "ઓર્ડર કરો", yourtable: "તમારા ટેબલ પર",
           waiter: "વેઈટર બોલાવો", bill: "બિલ માંગો", kitchen: "રસોઈ", guest: "ઓર્ડર",
           orders: "ઓર્ડર", calls: "કૉલ", clear: "પરોસેલા હટાવો", export: "CSV નિકાસ કરો",
           placed: "આપેલ", preparing: "તૈયાર થાય છે", served: "પરોસ્યું", cancelled: "રદ",
-          done: "થઈ ગયું", total: "કુલ", empty: "હજી કંઈ નથી.", preview: "જોડાયા નથી — પૂર્વાવલોકન મેનૂ.",
+          done: "થઈ ગયું", total: "કુલ", empty: "હજી કંઈ નથી.",
           connected: "જોડાયું", connecting: "જોડાઈ રહ્યું છે…", off: "જોડાયું નથી",
-          revenue: "કુલ વેચાણ", open: "બાકી", tables: "ટેબલ", waiterCall: "વેઈટર બોલાવ્યો", billCall: "બિલ માંગ્યું",
-          prep: "તૈયાર કરો", serve: "પરોસો", cancel: "રદ કરો", items: "વસ્તુઓ" }
+          revenue: "કુલ વેચાણ", open: "બાકી", tables: "ટેબલ", waiterCall: "વેઈટર બોલાવ્યો",
+          billCall: "બિલ માંગ્યું", prep: "તૈયાર કરો", serve: "પરોસો", cancel: "રદ કરો",
+          items: "વસ્તુઓ", solo: "ફક્ત આ ડિવાઇસ", search: "મેનૂ શોધો", all: "બધું",
+          soldOut: "ખતમ", soldOutShort: "ખતમ", menuTab: "મેનૂ", report: "શિફ્ટ રિપોર્ટ",
+          addItem: "વસ્તુ ઉમેરો", save: "સાચવો", reset: "ફોર્મ ખાલી કરો", price: "કિંમત (₹)",
+          sku: "એસકેયુ (વૈકલ્પિક)", itemName: "વસ્તુનું નામ", undo: "છેલ્લો ફેરફાર રદ કરો",
+          split: "બિલ વહેંચો", heads: "વ્યક્તિ", each: "દરેક", covers: "ગ્રાહક",
+          average: "સરેરાશ બિલ", topItems: "સૌથી વધુ વેચાયેલા", printReport: "રિપોર્ટ છાપો",
+          sound: "અવાજ", queued: "કતારમાં", newOrder: "નવો ઓર્ડર", minutes: "મિનિટ",
+          edit: "બદલો", del: "કાઢો", avail: "ઉપલબ્ધ",
+          printerOff: "રૂમ હોસ્ટ પર પ્રિન્ટર નથી — બ્રાઉઝરથી છપાશે.",
+          soloHint: "એક જ ડિવાઇસ આખી કેન્ટીન ચલાવે. કંઈ બહાર જતું નથી.",
+          joinHint: "હોસ્ટ શરૂ થાય ત્યારે આ સરનામું બતાવે છે. પિન ખાલી રાખો જો રૂમમાં ન હોય.",
+          menuHint: "ફેરફાર તરત જ બધા ડિવાઇસ પર જાય છે. ખતમ વસ્તુ પહેલાં આપેલા બિલ પર રહે છે." }
   };
   ["en", "hi", "gu"].forEach(function (l) { L.i18n.extend(l, S[l]); });
   function t(k) { return L.i18n.t(k); }
@@ -176,18 +277,20 @@
   /* ---- state ---- */
   var doc = C.newDoc();            /* the live board, rebuilt from the room's messages */
   var joined = false, kitchen = false, tab = "orders", status = "off";
-  var cart = {};                    /* sku -> qty */
+  var cart = L.storage.get("canteen:cart", {});
   var me = L.storage.get("canteen:me", {});
-  var client = null;
+  var client = null, heads = {}, filter = "", editing = "", soundOn = L.storage.get("canteen:sound", false);
+  var outbox = L.storage.get("canteen:outbox", []);
+  var seenOrders = {}, seenCalls = {};
 
-  /* ---- demo mode ----
-   * The landing page embeds this same page in a frame, seeded from the engine and
-   * with no transport at all: `?demo=1` (guest view) or `?demo=1&view=kitchen`.
-   * Every button still works, because send() applies the message to the local
-   * board instead of posting it. Nothing leaves the page. */
+  /* ---- mode ----
+   * demo   the landing page's frame: seeded board, nothing leaves the page
+   * solo   one device runs the whole canteen, board persisted locally
+   * room   a lan-host is the authority */
   var qs = new URLSearchParams(location.search);
   var demo = qs.get("demo") === "1";
-  var BUILD = "1.1.0 · 2026-11-01";
+  var solo = qs.get("solo") === "1";
+  var BUILD = "1.2.0 · 2026-11-01";
 
   /* ---- boot ---- */
   L.theme.apply();
@@ -201,72 +304,179 @@
   $("name").value = me.name || "";
   $("table").value = me.table || "";
   $("host").value = me.host || (location.hostname ? Lan.hostUrl(8080) : "http://192.168.1.20:8080");
+  $("pin").value = me.pin || "";
   $("build").textContent = "build " + BUILD;
+  paintSound();
 
   if (demo) {
     doc = C.demoDoc();
     joined = true; status = "demo";
     kitchen = qs.get("view") === "kitchen";
     if (qs.get("tab") === "calls") tab = "calls";
-    me = { name: "Aarti", table: qs.get("table") || "12", host: "" };
-    $("demoBar").hidden = false;
-    $("demoBar").textContent = "Demo board — sample orders seeded in this page. " +
+    if (qs.get("tab") === "menu") tab = "menu";
+    if (qs.get("tab") === "report") tab = "report";
+    me = { name: "Aarti", table: qs.get("table") || "12", host: "", pin: "" };
+    banner("Demo board — sample orders seeded in this page. " +
       (kitchen ? "Press Preparing / Served to move them along." : "Add to the cart and place the order.") +
-      " Nothing is sent anywhere.";
+      " Nothing is sent anywhere.", "warn");
+  } else if (solo) {
+    doc = C.fromJSON(L.storage.get("canteen:solo", ""));
+    joined = true; status = "solo"; kitchen = true;
+    banner(t("soloHint"), "info");
   }
 
   $("theme").addEventListener("click", function () { L.theme.toggle(); });
+  $("sound").addEventListener("click", function () {
+    soundOn = !soundOn; L.storage.set("canteen:sound", soundOn); paintSound(); if (soundOn) beep(1);
+  });
   $("viewBtn").addEventListener("click", function () { kitchen = !kitchen; render(); });
   $("joinBtn").addEventListener("click", join);
+  $("soloBtn").addEventListener("click", function () {
+    var q = new URLSearchParams(location.search); q.set("solo", "1");
+    location.search = q.toString();
+  });
   $("placeBtn").addEventListener("click", placeOrder);
   $("waiterBtn").addEventListener("click", function () { call("waiter"); });
   $("billBtn").addEventListener("click", function () { call("bill"); });
+  $("search").addEventListener("input", function () { filter = this.value; render(); });
   $("tabOrders").addEventListener("click", function () { tab = "orders"; render(); });
   $("tabCalls").addEventListener("click", function () { tab = "calls"; render(); });
-  $("clearBtn").addEventListener("click", function () { send({ t: "clear" }); });
+  $("tabMenu").addEventListener("click", function () { tab = "menu"; render(); });
+  $("tabReport").addEventListener("click", function () { tab = "report"; render(); });
+  $("clearBtn").addEventListener("click", function () { send({ t: "clear", by: me.name }); });
+  $("undoBtn").addEventListener("click", function () { send({ t: "undo", by: me.name }); });
   $("exportBtn").addEventListener("click", exportCSV);
+  $("printReport").addEventListener("click", function () { printReport(); });
+  $("miSave").addEventListener("click", saveItem);
+  $("miReset").addEventListener("click", function () { editing = ""; fillItemForm(null); });
+
+  if (!demo && !solo && "serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    navigator.serviceWorker.register("sw.js").then(function (r) { if (r.update) r.update(); }).catch(function () {});
+  }
+
+  function banner(text, kind) {
+    var b = $("demoBar");
+    b.textContent = text;
+    b.className = "demobar" + (kind === "info" ? " off" : "");
+    b.hidden = false;
+  }
 
   function label() {
     $("tag").textContent = t("tag");
     $("joinH").textContent = t("join");
-    $("lName").textContent = t("name"); $("lTable").textContent = t("table"); $("lHost").textContent = t("host");
-    $("joinBtn").textContent = t("join");
+    $("lName").textContent = t("name"); $("lTable").textContent = t("table");
+    $("lHost").textContent = t("host"); $("lPin").textContent = t("pin");
+    $("joinBtn").textContent = t("join"); $("soloBtn").textContent = t("solo");
+    $("joinHint").textContent = t("joinHint");
     $("hMenu").textContent = t("menu"); $("hCart").textContent = t("cart"); $("hMine").textContent = t("yourtable");
     $("note").placeholder = t("note"); $("placeBtn").textContent = t("place");
+    $("search").placeholder = t("search");
     $("waiterBtn").textContent = t("waiter"); $("billBtn").textContent = t("bill");
     $("viewBtn").textContent = kitchen ? t("guest") : t("kitchen");
     $("hKitchen").textContent = t("kitchen");
     $("tabOrders").textContent = t("orders"); $("tabCalls").textContent = t("calls");
+    $("tabMenu").textContent = t("menuTab"); $("tabReport").textContent = t("report");
     $("clearBtn").textContent = t("clear"); $("exportBtn").textContent = t("export");
+    $("undoBtn").textContent = "↶ " + t("undo");
+    $("lItemName").textContent = t("itemName"); $("lItemPrice").textContent = t("price");
+    $("lItemSku").textContent = t("sku"); $("miSave").textContent = t("save"); $("miReset").textContent = t("reset");
+    $("printReport").textContent = t("printReport");
+    paintFilters();
+  }
+
+  function paintSound() {
+    $("sound").setAttribute("aria-pressed", soundOn ? "true" : "false");
+    $("sound").style.color = soundOn ? "var(--acc)" : "";
   }
 
   /* ---- the room connection ---- */
   function join() {
-    var name = $("name").value.trim(), table = $("table").value.trim(), host = $("host").value.trim();
+    var name = $("name").value.trim(), table = $("table").value.trim();
+    var host = $("host").value.trim(), pin = $("pin").value.trim();
     if (!host) { $("joinMsg").textContent = t("host"); return; }
-    me = { name: name, table: table, host: host };
+    me = { name: name, table: table, host: host, pin: pin };
     L.storage.set("canteen:me", me);
     $("joinMsg").textContent = t("connecting");
     status = "connecting"; paintStatus();
     try { if (client) client.close(); } catch (e) {}
     client = Lan.client({
-      url: host,
-      onOpen: function () { joined = true; status = "on"; $("app").hidden = false; $("join").hidden = true; paintStatus(); render(); },
-      onMessage: function (m) { C.apply(doc, m); render(); },
+      url: host, pin: pin,
+      onOpen: function () { joined = true; status = "on"; paintStatus(); flush(); render(); },
+      onMessage: function (m) { inbound(m); },
       onError: function () { status = "off"; paintStatus(); }
     });
   }
 
+  /* Every message — from the room, from this device's own actions — lands here. */
+  function inbound(m) {
+    if (!m || typeof m !== "object") return;
+    C.apply(doc, m);
+    notice(m);
+    render();
+  }
+
   function send(msg) {
-    if (demo) { C.apply(doc, msg); render(); return; }   /* demo: the room is this page */
-    if (client) client.send(msg).catch(function () {});
+    if (!msg.by) msg.by = me.name || "guest";
+    if (demo) { inbound(msg); return; }                 /* the room is this page */
+    if (solo) { inbound(msg); persistSolo(); return; }   /* the board is this device */
+    if (status === "on" && client) {
+      client.send(msg).catch(function () { queue(msg); });
+    } else {
+      queue(msg);
+    }
+  }
+
+  /* ---- the outbox: an order placed while the Wi-Fi blinks is not lost ---- */
+  function queue(msg) {
+    outbox.push(msg);
+    if (outbox.length > 100) outbox.shift();
+    L.storage.set("canteen:outbox", outbox);
+    paintStatus();
+  }
+  function flush() {
+    if (!outbox.length) return;
+    var pending = outbox.slice();
+    outbox = [];
+    L.storage.set("canteen:outbox", outbox);
+    pending.forEach(function (m) { client.send(m).catch(function () { queue(m); }); });
+    paintStatus();
+  }
+  function persistSolo() { L.storage.set("canteen:solo", C.toJSON(doc)); }
+
+  /* ---- sound + announcements: the kitchen should hear a new order ---- */
+  var actx = null;
+  function beep(n) {
+    if (!soundOn) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      var o = actx.createOscillator(), g = actx.createGain();
+      o.type = "sine"; o.frequency.value = n > 1 ? 880 : 660;
+      g.gain.value = 0.06;
+      o.connect(g); g.connect(actx.destination);
+      o.start(); o.stop(actx.currentTime + 0.12);
+    } catch (e) {}
+    try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
+  }
+  function announce(text) { $("live").textContent = text; }
+  function notice(m) {
+    if (m.t === "order" && !seenOrders[m.id]) {
+      seenOrders[m.id] = 1;
+      if (kitchen) { announce(t("newOrder") + " — " + t("table") + " " + C.normTable(m.table)); beep(1); }
+    } else if (m.t === "call") {
+      var k = C.normTable(m.table) + ":" + m.kind;
+      if (!seenCalls[k]) { seenCalls[k] = 1; if (kitchen) { announce(t("waiterCall") + " " + k); beep(2); } }
+    }
   }
 
   function paintStatus() {
-    var d = $("status").firstChild;
-    d.className = "dot" + (status === "on" ? " on" : "");
-    $("statusText").textContent = status === "demo" ? "Demo" :
-      (status === "on" ? t("connected") : (status === "connecting" ? t("connecting") : t("off")));
+    var d = $("status").firstChild, txt;
+    if (status === "demo") txt = "Demo";
+    else if (status === "solo") txt = t("solo");
+    else if (status === "on") txt = t("connected") + (outbox.length ? " · " + outbox.length + " " + t("queued") : "");
+    else if (status === "connecting") txt = t("connecting");
+    else txt = t("off") + (outbox.length ? " · " + outbox.length + " " + t("queued") : "");
+    d.className = "dot" + (status === "on" || status === "solo" ? " on" : outbox.length ? " warn" : "");
+    $("statusText").textContent = txt;
   }
 
   function placeOrder() {
@@ -275,10 +485,10 @@
     if (!items.length) return;
     send({ t: "order", id: C.newId(), table: me.table || "?", by: me.name || "guest",
            note: $("note").value.trim(), items: items, ts: Date.now() });
-    cart = {}; $("note").value = ""; render();
+    cart = {}; L.storage.set("canteen:cart", cart); $("note").value = ""; render();
   }
 
-  function call(kind) { send({ t: "call", table: me.table || "?", kind: kind }); }
+  function call(kind) { send({ t: "call", table: me.table || "?", kind: kind, by: me.name }); }
 
   function exportCSV() {
     var rows = doc.orders.map(C.orderToRow);
@@ -286,110 +496,276 @@
     L.csv.download("canteen-orders.csv", L.csv.toCSV(rows));
   }
 
+  /* ---- printing: the browser prints the docket, offline ---- */
+  function printDocket(title, lines, foot) {
+    var area = $("printArea");
+    area.innerHTML = '<div style="font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;color:#000;padding:8px">' +
+      '<div style="font-size:16px;font-weight:700;letter-spacing:.1em">' + esc(title) + "</div>" +
+      '<div style="border-top:1px dashed #000;margin:6px 0"></div>' +
+      lines.map(function (l) { return '<div style="display:flex;justify-content:space-between;gap:12px"><span>' +
+        esc(l[0]) + "</span><span>" + esc(l[1]) + "</span></div>"; }).join("") +
+      (foot ? '<div style="border-top:1px dashed #000;margin:6px 0"></div><div>' + esc(foot) + "</div>" : "") +
+      "</div>";
+    window.print();
+  }
+  function printOrder(o, kind) {
+    var lines = o.items.map(function (l) { return [l.qty + " × " + l.name, C.money(l.price * l.qty)]; });
+    lines.push([t("total"), C.money(C.totalOf(o))]);
+    printDocket((kind === "bill" ? "BILL · " : "KOT · ") + t("table") + " " + o.table,
+      lines, (o.by || "") + (o.note ? " · " + o.note : ""));
+  }
+  function printReport() {
+    var r = C.report(doc);
+    var lines = [[t("covers"), String(r.covers)], [t("revenue"), C.money(r.revenue)],
+                 [t("average"), C.money(r.average)], [t("cancelled"), String(r.cancelled)]];
+    r.top.forEach(function (x) { lines.push([x.qty + " × " + x.name, C.money(x.revenue)]); });
+    printDocket("SHIFT REPORT", lines, new Date().toLocaleString());
+  }
+
+  /* ---- the menu editor ---- */
+  function paintFilters() {
+    var f = $("filters");
+    f.innerHTML = "";
+    [["", t("all")], ["veg", "veg"], ["spicy", "spicy"], ["fried", "fried"], ["dairy", "dairy"]].forEach(function (p) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = p[1];
+      b.className = filter === p[0] ? "on" : "";
+      b.addEventListener("click", function () { filter = p[0]; paintFilters(); render(); });
+      f.appendChild(b);
+    });
+  }
+
+  function slug(s) {
+    return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24);
+  }
+
+  function fillItemForm(item) {
+    editing = item ? item.sku : "";
+    $("miName").value = item ? item.name : "";
+    $("miPrice").value = item ? (item.price / 100) : "";
+    $("miSku").value = item ? item.sku : "";
+    var tags = item ? (item.tags || []) : [];
+    var box = $("miTags");
+    box.innerHTML = "";
+    Object.keys(C.TAGS).forEach(function (tag) {
+      var b = document.createElement("button");
+      b.type = "button"; b.textContent = tag; b.dataset.tag = tag;
+      b.className = tags.indexOf(tag) >= 0 ? "on" : "";
+      b.addEventListener("click", function () { b.classList.toggle("on"); });
+      box.appendChild(b);
+    });
+    $("miSave").textContent = item ? t("save") : t("addItem");
+    $("miMsg").textContent = item ? item.sku : "";
+  }
+
+  function saveItem() {
+    var name = $("miName").value.trim();
+    var rupees = parseFloat($("miPrice").value);
+    if (!name) { $("miMsg").textContent = t("itemName"); return; }
+    if (!isFinite(rupees) || rupees < 0) { $("miMsg").textContent = t("price"); return; }
+    var sku = C.normSku($("miSku").value.trim() || slug(name));
+    if (!sku) { $("miMsg").textContent = t("sku"); return; }
+    var tags = [].slice.call($("miTags").querySelectorAll("button.on")).map(function (b) { return b.dataset.tag; });
+    var existing = C.menuItem(doc, sku);
+    send({ t: "menu:set", by: me.name, item: {
+      sku: sku, name: name, price: Math.round(rupees * 100), tags: tags,
+      names: existing ? existing.names : {}, soldOut: existing ? existing.soldOut : false
+    } });
+    fillItemForm(null);
+    $("miMsg").textContent = t("menu") + ": " + name;
+  }
+
   /* ---- rendering ---- */
   function statusPill(s) { return '<span class="pill s-' + s + '">' + t(s) + "</span>"; }
 
   function render() {
     label();
+    paintStatus();
     $("app").hidden = !joined;
     $("join").hidden = joined;
     $("guest").hidden = kitchen;
     $("kitchen").hidden = !kitchen;
     if (!joined) return;
 
-    /* menu + cart (guest) */
-    var menu = doc.menu.length ? doc.menu : C.defaultMenu();
+    /* ---- guest: menu, cart, my table ---- */
+    var list = C.searchMenu(doc, $("search").value, { tag: filter });
     var mEl = $("menu"); mEl.innerHTML = "";
-    menu.forEach(function (it) {
+    if (!list.length) mEl.innerHTML = '<div class="card empty">' + t("empty") + "</div>";
+    list.forEach(function (it) {
       var q = cart[it.sku] || 0;
       var card = document.createElement("div");
-      card.className = "card";
-      card.innerHTML = '<div class="item"><div><b>' + esc(it.name) + "</b><br><small>" + C.money(it.price) + "</small></div>" +
-        '<div class="qty"><button data-m="-1">&minus;</button><span>' + q + '</span><button data-m="1">+</button></div></div>';
+      card.className = "card" + (it.soldOut ? " sold" : "");
+      var tagHtml = (it.tags || []).map(function (x) { return '<span class="tag">' + esc(x) + "</span>"; }).join("");
+      card.innerHTML = '<div class="item"><div><b>' + esc(C.menuItemName(it, L.i18n.lang)) + "</b><br><small>" +
+        C.money(it.price) + "</small><br>" + tagHtml + "</div>" +
+        (it.soldOut ? '<span class="tag">' + t("soldOutShort") + "</span>" :
+          '<div class="qty"><button data-m="-1" aria-label="−">&minus;</button><span>' + q +
+          '</span><button data-m="1" aria-label="+">+</button></div>') + "</div>";
       card.querySelectorAll("button").forEach(function (b) {
         b.addEventListener("click", function () {
           cart[it.sku] = Math.max(0, Math.min(C.MAX_QTY, (cart[it.sku] || 0) + parseInt(b.getAttribute("data-m"), 10)));
+          L.storage.set("canteen:cart", cart);
           render();
         });
       });
       mEl.appendChild(card);
     });
 
-    /* cart */
     var cEl = $("cart"); cEl.innerHTML = "";
     var lines = Object.keys(cart).filter(function (k) { return cart[k] > 0; });
     if (!lines.length) { cEl.innerHTML = '<div class="empty">' + t("empty") + "</div>"; }
     else {
       var total = 0;
       lines.forEach(function (k) {
-        var it = C.menuItem({ menu: menu }, k); if (!it) return;
+        var it = C.menuItem(doc, k); if (!it) return;
         total += it.price * cart[k];
-        cEl.insertAdjacentHTML("beforeend", '<div class="line"><span>' + esc(it.name) + " &times; " + cart[k] +
-          "</span><span>" + C.money(it.price * cart[k]) + "</span></div>");
+        cEl.insertAdjacentHTML("beforeend", '<div class="line"><span>' + esc(C.menuItemName(it, L.i18n.lang)) +
+          " &times; " + cart[k] + "</span><span>" + C.money(it.price * cart[k]) + "</span></div>");
       });
       cEl.insertAdjacentHTML("beforeend", '<div class="line"><b>' + t("total") + "</b><b>" + C.money(total) + "</b></div>");
     }
 
-    /* my table */
     var mine = C.ordersForTable(doc, me.table || "?");
     var mineEl = $("mine"); mineEl.innerHTML = "";
     if (!mine.length) mineEl.innerHTML = '<div class="card empty">' + t("empty") + "</div>";
     else mine.slice().reverse().forEach(function (o) { mineEl.appendChild(orderCard(o, false)); });
     var calls = C.callsForTable(doc, me.table || "?");
     if (calls.length) mineEl.insertAdjacentHTML("afterbegin",
-      '<div class="card mut">' + calls.map(function (c) { return t(c.kind === "bill" ? "billCall" : "waiterCall"); }).join(" · ") + "</div>");
+      '<div class="card mut">' + calls.map(function (c) {
+        return t(c.kind === "bill" ? "billCall" : "waiterCall"); }).join(" · ") + "</div>");
 
-    /* kitchen */
+    /* ---- kitchen ---- */
     var st = C.stats(doc);
     $("kstats").innerHTML =
-      stat(t("open"), st.open) + stat(t("tables"), st.tables) + stat(t("items"), st.items) + stat(t("revenue"), C.money(st.revenue));
+      stat(t("open"), st.open) + stat(t("tables"), st.tables) + stat(t("items"), st.items) +
+      stat(t("revenue"), C.money(st.revenue)) + stat(t("soldOut"), st.soldOut);
 
-    $("tabOrders").className = (tab === "orders" ? "primary " : "ghost ") + "sm";
-    $("tabCalls").className = (tab === "calls" ? "primary " : "ghost ") + "sm";
+    ["orders", "calls", "menu", "report"].forEach(function (k) {
+      var b = $("tab" + k.charAt(0).toUpperCase() + k.slice(1));
+      b.className = (tab === k ? "primary " : "ghost ") + "sm";
+    });
     $("korders").hidden = tab !== "orders";
     $("kcalls").hidden = tab !== "calls";
+    $("kmenu").hidden = tab !== "menu";
+    $("kreport").hidden = tab !== "report";
 
-    var kEl = $("korders"); kEl.innerHTML = "";
-    if (!doc.orders.length) kEl.innerHTML = '<div class="card empty">' + t("empty") + "</div>";
-    else {
-      var byTable = {};
-      doc.orders.forEach(function (o) { (byTable[o.table] = byTable[o.table] || []).push(o); });
-      Object.keys(byTable).sort().forEach(function (tb) {
-        var tot = C.tableTotals(doc)[tb] || 0;
-        kEl.insertAdjacentHTML("beforeend", '<div class="table-h"><b>' + t("table") + " " + esc(tb) +
-          '</b><span class="mut">' + C.money(tot) + "</span></div>");
-        byTable[tb].forEach(function (o) { kEl.appendChild(orderCard(o, true)); });
-      });
-    }
-
-    var cEl2 = $("kcalls"); cEl2.innerHTML = "";
-    if (!doc.calls.length) cEl2.innerHTML = '<div class="card empty">' + t("empty") + "</div>";
-    else doc.calls.forEach(function (c) {
-      var card = document.createElement("div"); card.className = "card row";
-      card.innerHTML = '<b>' + t("table") + " " + esc(c.table) + "</b> <span class=\"mut\">" +
-        t(c.kind === "bill" ? "billCall" : "waiterCall") + '</span><span class="grow"></span>';
-      var b = document.createElement("button"); b.className = "sm"; b.textContent = t("done");
-      b.addEventListener("click", function () { send({ t: "ack", table: c.table, kind: c.kind }); });
-      card.appendChild(b); cEl2.appendChild(card);
-    });
+    if (tab === "orders") renderOrders();
+    if (tab === "calls") renderCalls();
+    if (tab === "menu") renderMenuEditor();
+    if (tab === "report") renderReport();
   }
 
   function stat(label, value) { return '<div class="card"><small class="mut">' + label + "</small><b>" + value + "</b></div>"; }
 
+  function renderOrders() {
+    var kEl = $("klist"); kEl.innerHTML = "";
+    if (!doc.orders.length) { kEl.innerHTML = '<div class="card empty">' + t("empty") + "</div>"; return; }
+    var byTable = {};
+    doc.orders.forEach(function (o) { (byTable[o.table] = byTable[o.table] || []).push(o); });
+    var totals = C.tableTotals(doc);
+    Object.keys(byTable).sort().forEach(function (tb) {
+      var h = document.createElement("div");
+      h.className = "table-h";
+      var n = heads[tb] || 2;
+      var split = C.splitBill(doc, tb, n);
+      h.innerHTML = "<b>" + t("table") + " " + esc(tb) + '</b><span class="mut">' + C.money(totals[tb] || 0) + "</span>";
+      var sp = document.createElement("span");
+      sp.className = "row";
+      sp.innerHTML = '<span class="mut" style="font-size:12px">' + t("split") + "</span>" +
+        '<button class="sm ghost" data-h="-1">−</button><span class="mut">' + n + " " + t("heads") +
+        '</span><button class="sm ghost" data-h="1">+</button>' +
+        '<span class="mut" style="font-size:12px">' + C.money(split.shares[0]) + " " + t("each") + "</span>";
+      sp.querySelectorAll("button").forEach(function (b) {
+        b.addEventListener("click", function () {
+          heads[tb] = Math.max(1, Math.min(50, n + parseInt(b.getAttribute("data-h"), 10)));
+          render();
+        });
+      });
+      h.appendChild(sp);
+      kEl.appendChild(h);
+      byTable[tb].forEach(function (o) { kEl.appendChild(orderCard(o, true)); });
+    });
+  }
+
+  function renderCalls() {
+    var cEl = $("kcalls"); cEl.innerHTML = "";
+    if (!doc.calls.length) { cEl.innerHTML = '<div class="card empty">' + t("empty") + "</div>"; return; }
+    doc.calls.forEach(function (c) {
+      var card = document.createElement("div"); card.className = "card row";
+      card.innerHTML = "<b>" + t("table") + " " + esc(c.table) + '</b> <span class="mut">' +
+        t(c.kind === "bill" ? "billCall" : "waiterCall") + '</span><span class="grow"></span>';
+      var b = document.createElement("button"); b.className = "sm"; b.textContent = t("done");
+      b.addEventListener("click", function () { send({ t: "ack", table: c.table, kind: c.kind, by: me.name }); });
+      card.appendChild(b); cEl.appendChild(card);
+    });
+  }
+
+  function renderMenuEditor() {
+    var box = $("miList");
+    box.innerHTML = "";
+    if (!doc.menu.length) { box.innerHTML = '<div class="empty">' + t("empty") + "</div>"; return; }
+    doc.menu.forEach(function (m) {
+      var row = document.createElement("div");
+      row.className = "mi";
+      row.innerHTML = "<div><b>" + esc(m.name) + '</b> <span class="mut">' + esc(m.sku) + "</span><br>" +
+        '<small class="mut">' + C.money(m.price) + " · " +
+        (m.tags || []).join(" ") + (m.soldOut ? " · " + t("soldOut") : "") + "</small></div>";
+      var acts = document.createElement("div");
+      acts.className = "acts";
+      var bSold = document.createElement("button");
+      bSold.className = "sm ghost";
+      bSold.textContent = m.soldOut ? t("avail") : t("soldOut");
+      bSold.style.color = m.soldOut ? "var(--acc)" : "";
+      bSold.addEventListener("click", function () { send({ t: "menu:sold", sku: m.sku, soldOut: !m.soldOut, by: me.name }); });
+      var bEdit = document.createElement("button");
+      bEdit.className = "sm ghost"; bEdit.textContent = t("edit");
+      bEdit.addEventListener("click", function () { fillItemForm(m); window.scrollTo({ top: 0, behavior: "smooth" }); });
+      var bDel = document.createElement("button");
+      bDel.className = "sm danger"; bDel.textContent = t("del");
+      bDel.addEventListener("click", function () { send({ t: "menu:del", sku: m.sku, by: me.name }); });
+      acts.appendChild(bSold); acts.appendChild(bEdit); acts.appendChild(bDel);
+      row.appendChild(acts);
+      box.appendChild(row);
+    });
+  }
+
+  function renderReport() {
+    var r = C.report(doc);
+    var html = '<div class="stats">' + stat(t("covers"), r.covers) + stat(t("revenue"), C.money(r.revenue)) +
+      stat(t("average"), C.money(r.average)) + stat(t("cancelled"), r.cancelled) + "</div>";
+    html += "<h2>" + t("topItems") + "</h2>";
+    if (!r.top.length) html += '<div class="empty">' + t("empty") + "</div>";
+    else r.top.forEach(function (x) {
+      html += '<div class="line"><span>' + esc(x.name) + " &times; " + x.qty + "</span><span>" + C.money(x.revenue) + "</span></div>";
+    });
+    $("reportBody").innerHTML = html;
+  }
+
   function orderCard(o, actions) {
     var card = document.createElement("div"); card.className = "order";
     var lines = o.items.map(function (l) { return l.qty + "× " + esc(l.name); }).join("<br>");
+    var age = C.ageMinutes(o, Date.now());
     card.innerHTML = '<div class="top"><b>' + t("table") + " " + esc(o.table) + " · " + esc(o.by) + "</b>" +
-      statusPill(o.status) + "</div><div class=\"mut\">" + lines + "</div>" +
+      statusPill(o.status) + "</div>" +
+      '<div class="mut">' + lines + "</div>" +
       (o.note ? '<div class="mut">“' + esc(o.note) + '”</div>' : "") +
-      '<div class="top" style="margin-top:6px"><span class="mut">' + C.money(C.totalOf(o)) + "</span><span class=\"grow\"></span></div>";
+      '<div class="top" style="margin-top:6px"><span class="mut">' + C.money(C.totalOf(o)) +
+      (age != null && o.status !== "served" && o.status !== "cancelled" ? " · " + age + " " + t("minutes") : "") +
+      '</span><span class="grow"></span></div>';
+    var bar = card.querySelector(".top:last-child");
     if (actions) {
-      var bar = card.querySelector(".top:last-child");
       [["preparing", t("prep")], ["served", t("serve")], ["cancelled", t("cancel")]].forEach(function (p) {
         var b = document.createElement("button"); b.className = "sm"; b.textContent = p[1];
-        b.addEventListener("click", function () { send({ t: "status", id: o.id, status: p[0] }); });
+        b.addEventListener("click", function () { send({ t: "status", id: o.id, status: p[0], by: me.name }); });
         bar.appendChild(b);
       });
+      var pk = document.createElement("button"); pk.className = "sm ghost"; pk.textContent = "KOT";
+      pk.addEventListener("click", function () { printOrder(o, "kot"); });
+      bar.appendChild(pk);
+      var pb = document.createElement("button"); pb.className = "sm ghost"; pb.textContent = "Bill";
+      pb.addEventListener("click", function () { printOrder(o, "bill"); });
+      bar.appendChild(pb);
     }
     return card;
   }
@@ -397,6 +773,7 @@
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 
+  fillItemForm(null);
   paintStatus(); label(); render();
 })();
 </script>
@@ -410,7 +787,7 @@ window.__smokeTest = function () {
   ok("the document rendered", !!document.body && document.body.children.length > 0);
   ok("a heading is present", !!document.querySelector("h1, h2"));
   ok("no script threw during load", !window.__bootError);
-  var kits = ["Export","Loom","CryptoKit","Case","Search","Srs","Game","Art","Audio","Ml","UI","Lan","Astro"];
+  var kits = ["Canteen","Loom","Lan","UI","Search","Srs","Game","Art","Audio","Ml","Astro"];
   var found = kits.filter(function (k) { return window[k]; });
   ok("at least one kit is loaded (" + (found.join(", ") || "none") + ")", found.length > 0);
   try { localStorage.setItem("__smoke","1"); ok("storage works", localStorage.getItem("__smoke") === "1"); localStorage.removeItem("__smoke"); } catch (e) { ok("storage works", false); }
@@ -434,7 +811,12 @@ window.addEventListener("error", function () { window.__bootError = true; });
   button,.btn{border-radius:18px !important}
   input,textarea,select{border-radius:16px !important}
   .card,[class*="card"]{border-radius:20px !important}
-  button:not(.ghost):not(.tab){background:var(--acc) !important}
+  button.primary{background:var(--acc) !important}
+  #printArea{display:none}
+  @media print{
+    body>*:not(#printArea){display:none !important}
+    #printArea{display:block !important}
+  }
 </style>
 </body>
 </html>
