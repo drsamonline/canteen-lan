@@ -4,67 +4,460 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Canteen LAN — order from your table</title>
-<meta name="description" content="Order from your table over the room's own Wi-Fi. No app store, no internet.">
+<meta name="description" content="Order from your table over the room's own Wi-Fi. One laptop hosts the room, every phone on the LAN joins it. No internet, no accounts, no dependencies.">
+<meta name="theme-color" content="#efeae0">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <style>
-  :root{--bg:#fff8f1;--card:#ffffff;--ink:#26170c;--dim:#7a6553;
-        --line:#f0ddc9;--acc:#ea580c;}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;}
-  a{color:inherit}
-  .dl{display:flex;gap:9px;flex-wrap:wrap;margin:0}
-  .dl a{text-decoration:none;border:1px solid var(--line);border-radius:8px;
-        padding:10px 14px;font-size:13px;font-weight:600;background:var(--card);color:var(--ink)}
-  .dl a:hover{border-color:var(--acc);color:var(--acc)}
-  .dl small{display:block;font-weight:400;color:var(--dim);font-size:11px;margin-top:2px}
-  footer{margin-top:38px;padding-top:14px;border-top:1px solid var(--line);
-         color:var(--dim);font-size:12.5px}
-  footer a{color:var(--acc);text-decoration:none}
+  /* ---------------------------------------------------------------------------
+     Canteen LAN — the landing page.
 
-  .board{max-width:760px;margin:0 auto;padding:44px 24px 72px}
-  .crumb{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);text-decoration:none}
-  .hero{display:flex;gap:16px;align-items:center;margin:24px 0 12px}
-  .mark{border-radius:18px;box-shadow:0 12px 30px -18px rgba(0,0,0,.5)}
-  .kicker{font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);margin:0 0 3px}
-  h1{font-size:clamp(1.9rem,5vw,2.7rem);margin:0;letter-spacing:-.02em;font-weight:700}
-  .tag{font-size:1.06rem;color:var(--dim);margin:0 0 22px;max-width:50ch;line-height:1.6}
-  .go{display:inline-block;background:var(--acc);color:#fff;text-decoration:none;
-      padding:14px 24px;border-radius:999px;font-weight:700;font-size:15px;
-      box-shadow:0 16px 34px -18px var(--acc)}
-  .notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin:34px 0 0}
-  .n{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;
-     box-shadow:0 18px 40px -34px rgba(0,0,0,.6);transform:rotate(-.6deg)}
-  .n:nth-child(2){transform:rotate(.7deg)}
-  .n:nth-child(3){transform:rotate(-.3deg)}
-  .n h3{margin:0 0 6px;font-size:15px;font-weight:700}
-  .n p{margin:0;color:var(--dim);font-size:14px;line-height:1.6}
-  h2{font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin:36px 0 12px}
-  .note{color:var(--dim);font-size:13px;margin-top:20px}
+     Deliberately NOT the app. The app is warm, rounded, coral and friendly; this
+     page is a kitchen pass: dark slate or butcher paper, hairline rules, thermal
+     tickets, a display serif against monospace detail, square corners. Same
+     product, two different objects.
+     --------------------------------------------------------------------------- */
+  :root{
+    --bg:#efeae0; --paper:#fffdf7; --ink:#14120f; --dim:#6b6357;
+    --line:#d9d1c1; --rule:#c6bcaa; --acc:#a85c00; --ok:#2f6b4a;
+    --stamp:rgba(168,92,0,.07); --shadow:0 20px 44px -34px rgba(20,18,15,.55);
+    --serif:ui-serif,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  html[data-theme="dark"]{
+    --bg:#0d0e0f; --paper:#191c1f; --ink:#eceae3; --dim:#9a938a;
+    --line:#2b3034; --rule:#373d42; --acc:#f0a91a; --ok:#57b98a;
+    --stamp:rgba(240,169,26,.08); --shadow:0 22px 50px -34px rgba(0,0,0,.9);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans);
+       background-image:
+         linear-gradient(var(--stamp),transparent 340px),
+         repeating-linear-gradient(0deg,transparent 0 39px,color-mix(in srgb,var(--ink) 4%,transparent) 39px 40px);
+       background-repeat:no-repeat,repeat;background-attachment:fixed}
+  a{color:inherit}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  .mono{font-family:var(--mono)}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--acc);margin:0 0 10px}
+  h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.015em}
+  h1{font-size:clamp(2.5rem,6.4vw,4.4rem);line-height:.98;margin:0 0 18px}
+  h1 em{font-style:italic;color:var(--acc)}
+  h2{font-size:clamp(1.5rem,3vw,2.1rem);line-height:1.1;margin:0 0 8px}
+  p{margin:0 0 14px}
+  .lede{font-size:1.1rem;color:var(--dim);max-width:46ch;line-height:1.65}
+
+  /* ---------- header ---------- */
+  header{border-bottom:1px solid var(--line)}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 0}
+  .crumb{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;
+         text-decoration:none;color:var(--dim)}
+  .crumb:hover{color:var(--acc)}
+  .bar .sp{flex:1}
+  .bar a.lnk{font-family:var(--mono);font-size:12px;text-decoration:none;color:var(--dim)}
+  .bar a.lnk:hover{color:var(--acc)}
+  #themeBtn{font-family:var(--mono);font-size:12px;background:transparent;color:var(--ink);
+            border:1px solid var(--line);border-radius:2px;padding:6px 10px;cursor:pointer}
+  #themeBtn:hover{border-color:var(--acc);color:var(--acc)}
+  @media(max-width:620px){.bar a.lnk.hide-sm{display:none}}
+
+  /* ---------- hero ---------- */
+  .hero{display:grid;grid-template-columns:1.02fr .98fr;gap:52px;align-items:center;padding:58px 0 46px}
+  @media(max-width:900px){.hero{grid-template-columns:1fr;gap:34px;padding:40px 0 30px}}
+  .cta{display:flex;flex-wrap:wrap;gap:12px;margin:26px 0 22px}
+  .btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;font-weight:600;font-size:14.5px;
+       padding:13px 20px;border-radius:2px;border:1px solid var(--ink);background:var(--ink);color:var(--bg)}
+  .btn:hover{background:var(--acc);border-color:var(--acc);color:#fff}
+  .btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
+  .btn.ghost:hover{background:transparent;color:var(--acc);border-color:var(--acc)}
+  .badges{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+  .badges img{height:22px;width:auto;display:block}
+
+  /* the docket: this page's motif — a printed kitchen ticket */
+  .docket{background:var(--paper);border:1px solid var(--line);border-radius:3px;
+          box-shadow:var(--shadow);padding:20px 22px 16px;font-family:var(--mono);
+          font-size:12.5px;position:relative;transform:rotate(-.7deg)}
+  .docket::before,.docket::after{content:"";position:absolute;width:14px;height:14px;border-radius:50%;
+          background:var(--bg);border:1px solid var(--line);top:52px}
+  .docket::before{left:-8px}.docket::after{right:-8px}
+  .docket .top{display:flex;justify-content:space-between;align-items:baseline;
+          border-bottom:1px dashed var(--rule);padding-bottom:9px;margin-bottom:11px}
+  .docket .top b{font-family:var(--serif);font-size:17px;letter-spacing:.02em}
+  .docket .top span{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .docket .row{display:flex;gap:8px;align-items:baseline;padding:3px 0}
+  .docket .row .nm{flex:1;overflow:hidden;white-space:nowrap}
+  .docket .row .dot{flex:0 0 auto;border-bottom:1px dotted var(--rule);height:1em;flex:1}
+  .docket .row .pr{font-variant-numeric:tabular-nums}
+  .docket .tot{display:flex;justify-content:space-between;border-top:1px dashed var(--rule);
+          margin-top:11px;padding-top:9px;font-weight:700}
+  .docket .stamp{transform:rotate(-4deg);border:2px solid var(--acc);color:var(--acc);border-radius:2px;
+          padding:2px 8px;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;opacity:.85;
+          flex:0 0 auto;white-space:nowrap}
+  .docket .foot{margin-top:14px;padding-top:10px;border-top:1px dashed var(--rule);display:flex;
+          justify-content:space-between;align-items:center;gap:12px;font-size:10.5px;color:var(--dim);
+          letter-spacing:.1em;text-transform:uppercase}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .chip{font-family:var(--mono);font-size:11.5px;border:1px solid var(--line);border-radius:2px;
+        padding:5px 9px;color:var(--dim);background:color-mix(in srgb,var(--paper) 60%,transparent)}
+  .chip b{color:var(--ink);font-weight:600}
+
+  /* ---------- section heads ---------- */
+  section.band{padding:52px 0;border-top:1px solid var(--line)}
+  .head{display:flex;align-items:baseline;gap:14px;margin-bottom:26px}
+  .head .n{font-family:var(--mono);font-size:12px;color:var(--acc);letter-spacing:.1em}
+  .head .ln{flex:1;height:1px;background:var(--rule)}
+
+  /* ---------- the live demo ---------- */
+  .stage{position:relative;border:1px solid var(--line);border-radius:4px;background:var(--paper);
+         box-shadow:var(--shadow);overflow:hidden}
+  .frameBar{display:flex;align-items:center;gap:7px;padding:9px 12px;border-bottom:1px solid var(--line);
+         background:color-mix(in srgb,var(--ink) 4%,transparent)}
+  .frameBar i{width:9px;height:9px;border-radius:50%;background:var(--rule);display:block}
+  .frameBar .url{flex:1;font-family:var(--mono);font-size:11px;color:var(--dim);text-align:center;
+         overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .screen{position:relative;height:660px;background:var(--bg)}
+  @media(max-width:700px){.screen{height:600px}}
+  .screen .poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top center}
+  .screen iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--bg);
+         opacity:0;transition:opacity .25s ease}
+  .screen.live iframe{opacity:1}
+  .screen.live .poster{opacity:0;transition:opacity .25s ease}
+  .guide{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:16px 0 0}
+  .guide button{font-family:var(--mono);font-size:12px;letter-spacing:.04em;cursor:pointer;
+         background:transparent;color:var(--ink);border:1px solid var(--rule);border-radius:2px;padding:8px 12px}
+  .guide button:hover{border-color:var(--acc);color:var(--acc)}
+  .guide button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .guide .note{font-family:var(--mono);font-size:11.5px;color:var(--dim);margin-left:auto}
+
+  /* ---------- three cards ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1px;background:var(--rule);
+         border:1px solid var(--rule)}
+  .card{background:var(--bg);padding:24px 22px}
+  .card .n{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--acc)}
+  .card h3{font-size:1.22rem;margin:8px 0 8px}
+  .card p{color:var(--dim);font-size:14.5px;margin:0}
+
+  /* ---------- refusals ---------- */
+  .refuse{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 26px;list-style:none;
+          margin:0;padding:0}
+  .refuse li{font-family:var(--mono);font-size:13px;color:var(--dim);display:flex;gap:9px;align-items:baseline;
+          border-bottom:1px dotted var(--rule);padding:9px 0}
+  .refuse li::before{content:"✕";color:var(--acc);font-size:11px}
+
+  /* ---------- numbers ---------- */
+  .nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:26px}
+  .num b{display:block;font-family:var(--serif);font-size:2.5rem;line-height:1;letter-spacing:-.02em}
+  .num span{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+
+  /* ---------- run ---------- */
+  .run{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+  @media(max-width:820px){.run{grid-template-columns:1fr}}
+  pre{margin:0;background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:16px 18px;
+      font-family:var(--mono);font-size:12.5px;line-height:1.75;overflow-x:auto;color:var(--ink)}
+  pre .c{color:var(--dim)}
+  pre .k{color:var(--acc)}
+  .fine{font-size:14px;color:var(--dim)}
+
+  /* ---------- downloads, with icons ---------- */
+  .dl{display:flex;flex-wrap:wrap;gap:10px;margin:0}
+  .dl a{display:flex;align-items:center;gap:11px;text-decoration:none;border:1px solid var(--rule);
+        border-radius:2px;padding:11px 16px;background:var(--paper);color:var(--ink);min-width:172px}
+  .dl a:hover{border-color:var(--acc);color:var(--acc)}
+  .dl a svg{width:22px;height:22px;flex:0 0 auto}
+  .dl a span{display:block;font-size:13.5px;font-weight:600;line-height:1.2}
+  .dl a small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.06em}
+
+  /* ---------- next ---------- */
+  .next{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+        gap:18px 28px}
+  .next li{border-top:2px solid var(--rule);padding-top:11px}
+  .next b{display:block;font-size:14.5px;margin-bottom:3px}
+  .next span{font-size:13.5px;color:var(--dim)}
+
+  footer{border-top:1px solid var(--line);padding:30px 0 46px;color:var(--dim);font-size:13px}
+  footer .row{display:flex;flex-wrap:wrap;gap:14px;align-items:baseline}
+  footer a{color:var(--acc);text-decoration:none}
+  footer .stamp{font-family:var(--mono);font-size:11px;letter-spacing:.08em;margin-left:auto}
+  :focus-visible{outline:2px solid var(--acc);outline-offset:3px}
 </style>
 </head>
 <body>
 
-<div class="board">
-  <a class="crumb" href="https://drsamonline.github.io/">← all projects</a>
+<header>
+  <div class="wrap bar">
+    <a class="crumb" href="https://drsamonline.github.io/">← all projects</a>
+    <span class="sp"></span>
+    <a class="lnk hide-sm" href="#demo">Demo</a>
+    <a class="lnk hide-sm" href="#run">Run it</a>
+    <a class="lnk" href="https://github.com/drsamonline/canteen-lan">Source</a>
+    <button id="themeBtn" type="button" aria-label="Switch theme">theme</button>
+  </div>
+</header>
+
+<div class="wrap">
   <div class="hero">
-    <img class="mark" src="icon.png" alt="" width="64" height="64">
     <div>
-      <p class="kicker">order from your table</p>
-      <h1>Canteen LAN</h1>
+      <p class="eyebrow">LAN · no internet · no accounts</p>
+      <h1>Order from<br>your <em>table</em>.</h1>
+      <p class="lede">One laptop hosts the canteen on the room's own Wi-Fi. Every phone on the
+        network joins it, orders from its seat, and the kitchen watches each table move from
+        <span class="mono">placed</span> to <span class="mono">served</span> — with no internet
+        at any point.</p>
+      <div class="cta">
+        <a class="btn" href="play/">Open the board →</a>
+        <a class="btn ghost" href="#demo">Watch the kitchen</a>
+      </div>
+      <div class="badges">
+        <a href="https://drsamonline.github.io/canteen-lan/"><img src="assets/badge-live.svg" alt="live: online" width="98" height="22"></a>
+        <img src="assets/badge-tests.svg" alt="tests: 97 passing" width="112" height="22">
+        <img src="assets/badge-deps.svg" alt="deps: 0 runtime" width="104" height="22">
+        <img src="assets/badge-offline.svg" alt="offline: no network" width="118" height="22">
+        <img src="assets/badge-licence.svg" alt="licence: PolyForm NC 1.0.0" width="160" height="22">
+      </div>
+    </div>
+
+    <div>
+      <div class="docket" aria-label="Example order docket, table 12">
+        <div class="top"><b>TABLE 12</b><span>docket 0041</span></div>
+        <div class="row"><span class="nm">1 × Idli (2 pcs)</span><span class="dot"></span><span class="pr">₹30</span></div>
+        <div class="row"><span class="nm">1 × Filter coffee</span><span class="dot"></span><span class="pr">₹20</span></div>
+        <div class="row"><span class="nm">2 × Masala chai</span><span class="dot"></span><span class="pr">₹30</span></div>
+        <div class="tot"><span>TOTAL</span><span>₹80</span></div>
+        <div class="foot"><span>no onion · paid at counter</span><span class="stamp">preparing</span></div>
+      </div>
+      <div class="chips">
+        <span class="chip">host <b>node host/room.js</b></span>
+        <span class="chip">join <b>http://192.168.1.20:8080</b></span>
+        <span class="chip">money <b>integer paise</b></span>
+      </div>
     </div>
   </div>
-  <p class="tag">Order from your table over the room's own Wi-Fi. No app store, no internet.</p>
-  <div class="acts"><a class="go" href="play/">Open the board →</a></div>
-  <div class="notes">
-    <div class="n"><h3>One device hosts</h3><p>The board runs on the room's LAN - no server, no cloud.</p></div><div class="n"><h3>Everyone orders</h3><p>Each table opens the board and orders from it.</p></div><div class="n"><h3>Works with the internet off</h3><p>The router is all it needs.</p></div>
-  </div>
-  <h2>Install</h2>
-  <div class="dl">
-      <a href="https://github.com/drsamonline/canteen-lan/releases/download/app-latest/canteen-lan.apk">Android<small>APK</small></a>
-      <a href="https://github.com/drsamonline/canteen-lan/releases/download/app-latest/canteen-lan-portable.exe">Windows<small>EXE</small></a>
-      <a href="https://github.com/drsamonline/canteen-lan/releases/download/app-latest/canteen-lan-linux">Linux<small>binary</small></a>
-    </div>
-  <p class="note">Part of the Forge system: a LAN canteen board for a real room.</p>
-  <footer><a href="https://github.com/drsamonline/canteen-lan">Source</a> · <a href="https://github.com/drsamonline/canteen-lan/blob/main/LICENSE">Licence</a> · Dr. Sohil Momin</footer>
 </div>
+
+<section class="band" id="demo">
+  <div class="wrap">
+    <div class="head"><span class="n">01</span><h2>The board, running</h2><span class="ln"></span></div>
+    <p class="lede" style="margin-bottom:22px">This is the app itself in a frame — seeded with a
+      shift's worth of orders, with no server behind it. Press the buttons: move an order along,
+      open a table's cart, answer a waiter call.</p>
+
+    <div class="stage">
+      <div class="frameBar">
+        <i></i><i></i><i></i>
+        <span class="url" id="frameUrl">play/?demo=1&amp;view=kitchen</span>
+      </div>
+      <div class="screen" id="screen">
+        <img class="poster" src="assets/app-desktop.png" alt="The kitchen board, orders grouped by table">
+        <iframe id="demoFrame" title="Canteen board — live demo" loading="lazy"
+                src="play/?demo=1&amp;view=kitchen"></iframe>
+      </div>
+    </div>
+
+    <div class="guide" role="group" aria-label="Demo views">
+      <button type="button" data-view="kitchen" aria-pressed="true">Kitchen board</button>
+      <button type="button" data-view="guest" aria-pressed="false">Guest menu</button>
+      <button type="button" data-view="calls" aria-pressed="false">Calls &amp; tables</button>
+      <span class="note">same code as <span class="mono">play/</span> · nothing is sent anywhere</span>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head"><span class="n">02</span><h2>Three surfaces, one room</h2><span class="ln"></span></div>
+    <div class="cards">
+      <div class="card">
+        <div class="n">GUEST</div>
+        <h3>Order from the seat</h3>
+        <p>Pick a table and a name, add items to a cart, add a note like “less spicy”, and place it.
+          The bill for your table stays visible, and you can call the waiter or ask for the bill.</p>
+      </div>
+      <div class="card">
+        <div class="n">KITCHEN</div>
+        <h3>Every table, live</h3>
+        <p>Orders arrive grouped by table with the running bill beside them. Mark one preparing,
+          served or cancelled, acknowledge calls, wipe the served pile at the end of a shift, and
+          export the day as CSV.</p>
+      </div>
+      <div class="card">
+        <div class="n">ROOM</div>
+        <h3>The Wi-Fi is the server</h3>
+        <p>A tiny Node host keeps the board, replays its history to anyone who joins late, and
+          broadcasts over Server-Sent Events. Phones talk back with a plain POST.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head"><span class="n">03</span><h2>What it refuses to do</h2><span class="ln"></span></div>
+    <ul class="refuse">
+      <li>no cloud, no server outside the room</li>
+      <li>no accounts, logins or passwords</li>
+      <li>no internet, at any point</li>
+      <li>no telemetry or analytics</li>
+      <li>no CDN, no external font, no image service</li>
+      <li>no app store to install it</li>
+      <li>no dependency at runtime</li>
+      <li>no prices taken from the message — ever</li>
+    </ul>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head"><span class="n">04</span><h2>The numbers</h2><span class="ln"></span></div>
+    <div class="nums">
+      <div class="num"><b>97</b><span>tests passing</span></div>
+      <div class="num"><b>0</b><span>runtime deps</span></div>
+      <div class="num"><b>7</b><span>protocol messages</span></div>
+      <div class="num"><b>10</b><span>menu items seeded</span></div>
+      <div class="num"><b>₹0</b><span>to host a room</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="run">
+  <div class="wrap">
+    <div class="head"><span class="n">05</span><h2>Run a room</h2><span class="ln"></span></div>
+    <div class="run">
+      <div>
+        <pre><span class="c"># on one laptop, Pi — anything with Node</span>
+<span class="k">node</span> host/room.js
+
+<span class="c"># prints the address for the room, e.g.</span>
+<span class="c"># http://192.168.1.20:8080</span></pre>
+      </div>
+      <div>
+        <pre><span class="c"># then, on any phone on the same Wi-Fi</span>
+<span class="k">open</span> http://192.168.1.20:8080
+<span class="c"># or the published board, and paste that</span>
+<span class="c"># address into "Join room"</span>
+
+<span class="c"># the whole mechanic, headless</span>
+<span class="k">node</span> test-node.js   <span class="c">→ 97 passed</span></pre>
+      </div>
+    </div>
+    <p class="fine" style="margin-top:20px">Override the seeded menu with
+      <span class="mono">--menu my-menu.json</span> — an array of
+      <span class="mono">{ "sku", "name", "price" }</span>, price in paise.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head"><span class="n">06</span><h2>Take it with you</h2><span class="ln"></span></div>
+    <div class="dl">
+      <a href="https://github.com/drsamonline/canteen-lan/releases/download/app-latest/canteen-lan.apk">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 9h12v8.5a1.5 1.5 0 0 1-1.5 1.5h-1v2.2a1.3 1.3 0 0 1-2.6 0V19h-1.8v2.2a1.3 1.3 0 0 1-2.6 0V19h-1A1.5 1.5 0 0 1 6 17.5V9Zm-2.6 0A1.4 1.4 0 0 1 4.8 10.4v5.2a1.4 1.4 0 0 1-2.8 0v-5.2A1.4 1.4 0 0 1 3.4 9Zm17.2 0a1.4 1.4 0 0 1 1.4 1.4v5.2a1.4 1.4 0 0 1-2.8 0v-5.2A1.4 1.4 0 0 1 20.6 9ZM7.4 8a4.7 4.7 0 0 1 9.2 0H7.4Zm2-4.6.9 1.6a.5.5 0 0 1-.9.5l-.9-1.6a.5.5 0 0 1 .9-.5Zm6.3.5-.9 1.6a.5.5 0 0 1-.9-.5l.9-1.6a.5.5 0 0 1 .9.5Z"/></svg>
+        <span>Android<small>APK · signed</small></span>
+      </a>
+      <a href="https://github.com/drsamonline/canteen-lan/releases/download/app-latest/canteen-lan-portable.exe">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 4.6 10.4 3.4v8.2H2V4.6Zm9.6-1.4L22 1.5v10.1H11.6V3.2ZM2 12.9h8.4v8.2L2 19.9v-7Zm9.6 0H22v10.1l-10.4-1.5V12.9Z"/></svg>
+        <span>Windows<small>EXE · portable</small></span>
+      </a>
+      <a href="https://github.com/drsamonline/canteen-lan/releases/download/app-latest/canteen-lan-linux">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.8a4.6 4.6 0 0 1 4.6 4.6c0 1.5.4 2.6 1.2 3.8 1.4 2 2.4 3.6 2.4 5.6 0 1.4-.5 2.6-1.4 3.3-.6.5-.6 1-.6 1.6v.6c0 .6-.5 1.1-1.1 1.1H6.9c-.6 0-1.1-.5-1.1-1.1v-.6c0-.6 0-1.1-.6-1.6-.9-.7-1.4-1.9-1.4-3.3 0-2 1-3.6 2.4-5.6.8-1.2 1.2-2.3 1.2-3.8A4.6 4.6 0 0 1 12 1.8Zm-1.7 4.1a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6Zm3.4 0a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6Zm-1.7 2.3c-.9 0-1.9.7-1.9 1.2 0 .4.9.9 1.9.9s1.9-.5 1.9-.9c0-.5-1-1.2-1.9-1.2Z"/></svg>
+        <span>Linux<small>binary</small></span>
+      </a>
+    </div>
+    <p class="fine" style="margin-top:16px">Every build comes from the same commit as this page, so
+      the demo and the download can never disagree. The board itself is
+      <a href="play/" style="color:var(--acc)">one page</a> — nothing to install if you only want to
+      order.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head"><span class="n">07</span><h2>What it could become</h2><span class="ln"></span></div>
+    <ul class="next">
+      <li><b>A real offline board</b><span>A service worker so a phone keeps its menu and cart when
+        the Wi-Fi drops mid-order, and re-sends on reconnect.</span></li>
+      <li><b>Print, don't squint</b><span>One-tap KOT and bill slips to a thermal printer on the
+        same LAN — the docket this page draws, on paper.</span></li>
+      <li><b>Split the bill</b><span>Per-head totals on a table, with a share summary the guest can
+        read before paying at the counter.</span></li>
+      <li><b>Shift close</b><span>An end-of-day summary — covers, top sellers, cancellations — from
+        the board's own history, still with no cloud.</span></li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap row">
+    <span>Canteen LAN · part of the Forge system</span>
+    <a href="https://github.com/drsamonline/canteen-lan">Source</a>
+    <a href="https://github.com/drsamonline/canteen-lan/blob/main/LICENSE">Licence</a>
+    <a href="play/">Open the board</a>
+    <span class="stamp" id="stamp">build</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---- theme: light is the base, the system preference decides the first paint,
+     and this page remembers its choice under its OWN key so it never overrides
+     the app's toggle. ---- */
+  var KEY = "canteen-lan-landing:theme";
+  var btn = document.getElementById("themeBtn");
+  function system() {
+    try { return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }
+    catch (e) { return "light"; }
+  }
+  function paint(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", t === "dark" ? "#0d0e0f" : "#efeae0");
+    btn.textContent = t === "dark" ? "light" : "dark";
+  }
+  var forced = new URLSearchParams(location.search).get("theme");
+  var saved = null;
+  try { saved = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  paint(forced === "dark" || forced === "light" ? forced
+      : saved === "dark" || saved === "light" ? saved : system());
+  btn.addEventListener("click", function () {
+    var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    paint(next);
+    try { localStorage.setItem(KEY, JSON.stringify(next)); } catch (e) {}
+  });
+
+  /* ---- the demo: the real app in a frame, moved to a view by the buttons ---- */
+  var frame = document.getElementById("demoFrame");
+  var screen = document.getElementById("screen");
+  var url = document.getElementById("frameUrl");
+  var buttons = [].slice.call(document.querySelectorAll(".guide button"));
+
+  function view(name) {
+    var src = name === "guest" ? "play/?demo=1&table=12"
+            : name === "calls" ? "play/?demo=1&view=kitchen&tab=calls"
+            : "play/?demo=1&view=kitchen";
+    frame.src = src;
+    url.textContent = src;
+    buttons.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.view === name)); });
+  }
+  buttons.forEach(function (b) {
+    b.addEventListener("click", function () { view(b.dataset.view); });
+  });
+
+  /* Reveal the frame only once the app has actually loaded, and only when the page
+     is served over http(s) — where a same-origin play/ frame is guaranteed to
+     render. Opened from file:// the browser refuses file frames, so the poster
+     screenshot stays in place rather than showing an empty hole. */
+  var revealed = false;
+  if (/^https?:$/.test(location.protocol)) {
+    frame.addEventListener("load", function () {
+      if (revealed) return;
+      revealed = true;
+      screen.classList.add("live");
+    });
+  }
+
+  document.getElementById("stamp").textContent = "build 1.1.0 · 2026-11-01";
+})();
+</script>
 </body>
 </html>

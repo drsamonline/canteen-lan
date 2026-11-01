@@ -292,6 +292,26 @@
     return doc;
   }
 
+  /* A seeded board for the demo on the landing page (and for tests). It is built
+   * by replaying ordinary protocol messages, so the demo can never show a state
+   * the real app could not reach. Fixed ids and timestamps keep it deterministic. */
+  function demoDoc() {
+    return replay([
+      { t: "order", id: "d1a4e0c7k2", table: "4", by: "Aarti", note: "less spicy", ts: 1,
+        items: [{ sku: "dosa", qty: 1 }, { sku: "chai", qty: 2 }] },
+      { t: "order", id: "d2b7f1d8m3", table: "7", by: "Ravi", ts: 2,
+        items: [{ sku: "thali", qty: 2 }, { sku: "lime", qty: 2 }] },
+      { t: "order", id: "d3c8g2e9n4", table: "12", by: "Meera", note: "no onion", ts: 3,
+        items: [{ sku: "idli", qty: 1 }, { sku: "coffee", qty: 1 }] },
+      { t: "order", id: "d4d9h3f0p5", table: "4", by: "Aarti", ts: 4,
+        items: [{ sku: "samosa", qty: 1 }] },
+      { t: "status", id: "d1a4e0c7k2", status: "preparing" },
+      { t: "status", id: "d4d9h3f0p5", status: "served" },
+      { t: "call", table: "7", kind: "bill" },
+      { t: "call", table: "12", kind: "waiter" }
+    ]);
+  }
+
   /* Apply a whole sequence — used by a late joiner replaying the room history. */
   function replay(messages) {
     var doc = newDoc();
@@ -403,6 +423,7 @@
     callsForTable: callsForTable,
     apply: apply,
     replay: replay,
+    demoDoc: demoDoc,
     stats: stats,
     toJSON: toJSON,
     fromJSON: fromJSON,

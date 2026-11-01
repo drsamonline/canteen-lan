@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.1.0 — 2026-11-01
+
+- **The app boots again.** `docs/play/` never shipped the web-kit it was built on, so
+  `Loom` was undefined and the page threw on the first line of boot: 78 engine tests
+  green, dead screen. `docs/play/web-kit.js` is now the local, zero-dependency slice the
+  app calls (storage, i18n, CSV, theme, seo, ui). A test reads `docs/play/index.html`
+  and fails if any script it references is missing, or is remote.
+- **A landing page of its own.** `docs/index.html` was the app with a different heading;
+  it is now a kitchen pass — thermal tickets, hairline rules, a display serif against
+  monospace, light and dark, its own remembered theme key — and the app is untouched at
+  `docs/play/`.
+- **The demo is the app.** The landing page frames the real board, seeded by
+  `Canteen.demoDoc()` through the ordinary protocol, and three buttons move it between
+  the kitchen, the guest menu and the calls tab. `?demo=1` needs no server and posts
+  nothing; every button still works because the message is applied to the local board.
+- **Badges drawn locally.** `scripts/badges.py` writes `docs/assets/badge-*.svg`; the
+  README and the page reference them by relative path. No shields.io, no image service —
+  an offline-first app should not need the network to describe itself.
+- **Screenshots and icons.** `docs/assets/app-desktop.png`, `app-mobile.png`,
+  `landing-desktop.png`, `landing-mobile.png` are real Chromium captures of the shipped
+  pages; the download buttons carry platform icons and the release carries the app icon.
+- Tests: 78 → 97 (demo board, and the page-ships-what-it-loads check).
+- The README's licence line said MIT while `LICENSE` has been PolyForm Noncommercial
+  1.0.0 since 1.0.0; the two now agree.
+
 ## 1.0.0 — 2026-10-25
 
 - **Licence: PolyForm Noncommercial 1.0.0.** Every repository now carries the canonical text

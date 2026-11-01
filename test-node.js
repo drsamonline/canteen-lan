@@ -202,7 +202,41 @@ console.log("Canteen engine " + C.version + " — tests");
   ok("row total", row.total === "\u20b990");
 })();
 
-/* ---- 13. live: the room transport carries a real order ---- */
+/* ---- 13. the demo board the landing page embeds ---- */
+(function () {
+  var d = C.demoDoc();
+  ok("demoDoc is deterministic", C.toJSON(C.demoDoc()) === C.toJSON(d));
+  ok("demo has orders on several tables", d.orders.length === 4 && C.stats(d).tables === 3);
+  ok("demo shows every status", ["placed", "preparing", "served"].every(function (s) {
+    return d.orders.some(function (o) { return o.status === s; });
+  }));
+  ok("demo has a bill and a waiter call", d.calls.length === 2);
+  ok("demo revenue is the live bill", C.stats(d).revenue === C.tableTotals(d)["4"] + C.tableTotals(d)["7"] + C.tableTotals(d)["12"]);
+  ok("demo survives the snapshot roundtrip", C.toJSON(C.fromJSON(C.toJSON(d))) === C.toJSON(d));
+})();
+
+/* ---- 14. the page ships everything it loads (the bug that shipped a dead app) ---- */
+(function () {
+  var fs = require("fs");
+  var play = path.join(__dirname, "docs", "play");
+  var html = fs.readFileSync(path.join(play, "index.html"), "utf8");
+  var srcs = (html.match(/<script[^>]+src="([^"]+)"/g) || []).map(function (s) {
+    return s.replace(/^.*src="([^"]+)".*$/, "$1");
+  });
+  ok("the page loads its scripts", srcs.length >= 3);
+  srcs.forEach(function (s) {
+    ok("script present: " + s, !/^(https?:)?\/\//.test(s) && fs.existsSync(path.join(play, s)));
+  });
+  ok("web-kit is shipped locally", srcs.indexOf("web-kit.js") !== -1);
+  ok("no external asset in the app page", !/(src|href)="https?:\/\//.test(html));
+  var webkit = fs.readFileSync(path.join(play, "web-kit.js"), "utf8");
+  ["storage", "i18n", "csv", "theme", "seo", "ui"].forEach(function (k) {
+    ok("web-kit exposes " + k, new RegExp("Loom\\." + k + "\\s*=").test(webkit));
+  });
+  ok("web-kit fetches nothing", !/fetch\(|XMLHttpRequest|https?:\/\//.test(webkit));
+})();
+
+/* ---- 15. live: the room transport carries a real order ---- */
 function get(url, onData) {
   return new Promise(function (resolve) {
     var req = http.get(url, function (res) {

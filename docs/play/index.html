@@ -47,6 +47,8 @@
   .empty{color:var(--mut);font-style:italic}
   footer{color:var(--mut);font-size:13px;border-top:1px solid var(--line);margin-top:30px}
   [hidden]{display:none!important}
+  .demobar{max-width:900px;margin:12px auto 0;padding:9px 14px;border:1px dashed var(--warn);border-radius:10px;
+    color:var(--warn);font-size:13px;line-height:1.5}
   label{font-size:13px;color:var(--mut);display:block;margin-bottom:3px}
 </style>
 </head>
@@ -60,6 +62,8 @@
     <button id="viewBtn" class="sm">Kitchen</button>
   </div>
 </header>
+
+<div id="demoBar" class="demobar" hidden></div>
 
 <main>
   <section id="join">
@@ -117,8 +121,10 @@
 
 <footer class="mut">
   Built with Forge · web-kit + lan-kit · offline, no accounts · © 2026 Dr Sohil Momin
+  · <span id="build"></span>
 </footer>
 
+<script src="web-kit.js"></script>
 <script src="lan-kit.js"></script>
 <script src="canteen.js"></script>
 <script>
@@ -170,6 +176,15 @@
   var me = L.storage.get("canteen:me", {});
   var client = null;
 
+  /* ---- demo mode ----
+   * The landing page embeds this same page in a frame, seeded from the engine and
+   * with no transport at all: `?demo=1` (guest view) or `?demo=1&view=kitchen`.
+   * Every button still works, because send() applies the message to the local
+   * board instead of posting it. Nothing leaves the page. */
+  var qs = new URLSearchParams(location.search);
+  var demo = qs.get("demo") === "1";
+  var BUILD = "1.1.0 · 2026-11-01";
+
   /* ---- boot ---- */
   L.theme.apply();
   L.seo.title("Canteen — order from your table");
@@ -182,6 +197,19 @@
   $("name").value = me.name || "";
   $("table").value = me.table || "";
   $("host").value = me.host || Lan.hostUrl(8080);
+  $("build").textContent = "build " + BUILD;
+
+  if (demo) {
+    doc = C.demoDoc();
+    joined = true; status = "demo";
+    kitchen = qs.get("view") === "kitchen";
+    if (qs.get("tab") === "calls") tab = "calls";
+    me = { name: "Aarti", table: qs.get("table") || "12", host: "" };
+    $("demoBar").hidden = false;
+    $("demoBar").textContent = "Demo board — sample orders seeded in this page. " +
+      (kitchen ? "Press Preparing / Served to move them along." : "Add to the cart and place the order.") +
+      " Nothing is sent anywhere.";
+  }
 
   $("theme").addEventListener("click", function () { L.theme.toggle(); });
   $("viewBtn").addEventListener("click", function () { kitchen = !kitchen; render(); });
@@ -225,12 +253,16 @@
     });
   }
 
-  function send(msg) { if (client) client.send(msg).catch(function () {}); }
+  function send(msg) {
+    if (demo) { C.apply(doc, msg); render(); return; }   /* demo: the room is this page */
+    if (client) client.send(msg).catch(function () {});
+  }
 
   function paintStatus() {
     var d = $("status").firstChild;
     d.className = "dot" + (status === "on" ? " on" : "");
-    $("statusText").textContent = status === "on" ? t("connected") : (status === "connecting" ? t("connecting") : t("off"));
+    $("statusText").textContent = status === "demo" ? "Demo" :
+      (status === "on" ? t("connected") : (status === "connecting" ? t("connecting") : t("off")));
   }
 
   function placeOrder() {
