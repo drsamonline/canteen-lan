@@ -23,7 +23,7 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var VERSION = "1.4.0";
+  var VERSION = "1.5.0";
 
   var MAX_ORDERS = 5000;
   var MAX_ITEMS_PER_ORDER = 50;
@@ -462,6 +462,12 @@
     return null;
   }
 
+  /* How many moves are still undoable. The log keeps them, so the kitchen can step
+   * back through a shift rather than one tap at a time. */
+  function undoDepth(doc) {
+    return ((doc && doc.log) || []).filter(function (e) { return e.kind === "status"; }).length;
+  }
+
   /* Drop every served or cancelled order — the "wipe the done pile" action. */
   function clearServed(doc, by) {
     if (!doc) return doc;
@@ -846,6 +852,7 @@
     setStatus: setStatus,
     cancelOrder: cancelOrder,
     undoLast: undoLast,
+    undoDepth: undoDepth,
     clearServed: clearServed,
     ordersForTable: ordersForTable,
     tableTotals: tableTotals,

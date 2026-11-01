@@ -168,9 +168,12 @@ function billText(order) {
     host.broadcast({ t: "menu", items: menu });
   }
 
-  function defaultUrl() {
+  /* The address the code carries, with the PIN in it: scan, and the board opens
+     already pointed at this room and already holding the PIN. */
+  function defaultUrl(withPin) {
     const a = lanAddresses()[0];
-    return "http://" + (a ? a.address : "localhost") + ":" + bound + "/";
+    const base = "http://" + (a ? a.address : "localhost") + ":" + bound + "/";
+    return pin && withPin !== false ? base + "?pin=" + encodeURIComponent(pin) : base;
   }
 
   function joinPage(to) {
@@ -212,7 +215,8 @@ function billText(order) {
   lanAddresses().forEach((a) => {
     console.log("  on the LAN (" + a.name + "):  http://" + a.address + ":" + bound + "/");
   });
-  console.log("\n  Guests: open that address, or scan the code on /join\n");
+  console.log("\n  Guests: open that address, or scan the code on /join");
+  console.log("  (the code carries the room PIN, so scanning joins in one step)\n");
   try { console.log(qr.toText(defaultUrl(), { border: 1 })); } catch (e) { /* terminal qr is a nicety */ }
   console.log("\nCtrl-C to stop.\n");
 

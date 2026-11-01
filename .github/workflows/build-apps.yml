@@ -51,6 +51,8 @@ jobs:
         run: node test-node.js
       - name: node scripts/smoke-host.js
         run: node scripts/smoke-host.js
+      - name: node scripts/link-check.js
+        run: node scripts/link-check.js
 
   app:
     needs: test

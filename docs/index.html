@@ -209,7 +209,7 @@
       </div>
       <div class="badges">
         <a href="https://drsamonline.github.io/canteen-lan/"><img src="assets/badge-live.svg" alt="live: online" width="98" height="22"></a>
-        <img src="assets/badge-tests.svg" alt="tests: 235 passing" width="118" height="22">
+        <img src="assets/badge-tests.svg" alt="tests: 247 passing" width="118" height="22">
         <img src="assets/badge-deps.svg" alt="deps: 0 runtime" width="104" height="22">
         <img src="assets/badge-offline.svg" alt="offline: no network" width="118" height="22">
         <img src="assets/badge-licence.svg" alt="licence: PolyForm NC 1.0.0" width="160" height="22">
@@ -282,8 +282,9 @@
         <p>Orders arrive grouped by table — or as a <b>floor</b> of tiles you can tap — with the
           running bill and how long each has waited. Mark one preparing, served or cancelled, undo
           the last move, split a bill across heads, edit the menu with its <b>stock counts</b>,
-          <b>modifiers</b> and <b>serving windows</b>, read the shift report on screen or as an
-          <b>A4 sheet</b>, print a KOT, and export the day as CSV.</p>
+          <b>modifiers</b> and <b>serving windows</b>, print the <b>menu board for the wall</b> on
+          A3, read the shift report on screen or as an <b>A4 sheet</b>, print a KOT, export the day
+          as CSV, and <b>download the shift</b> as a file you can put back later.</p>
       </div>
       <div class="card">
         <div class="n">ROOM</div>
@@ -291,7 +292,8 @@
         <p>A tiny Node host serves the board itself, journals every message to a plain file,
           replays the shift to anyone who joins late or after a restart, and broadcasts over
           Server-Sent Events. <span class="mono">--mirror</span> keeps a second host in step, so the
-          counter survives the laptop.</p>
+          counter survives the laptop, and the join code carries the room PIN so scanning is the
+          whole join.</p>
       </div>
     </div>
   </div>
@@ -354,7 +356,7 @@
   <div class="wrap">
     <div class="head"><span class="n">05</span><h2>The numbers</h2><span class="ln"></span></div>
     <div class="nums">
-      <div class="num"><b>235</b><span>tests passing</span></div>
+      <div class="num"><b>247</b><span>tests passing</span></div>
       <div class="num"><b>0</b><span>runtime deps</span></div>
       <div class="num"><b>12</b><span>protocol messages</span></div>
       <div class="num"><b>10</b><span>menu items seeded</span></div>
@@ -390,7 +392,7 @@
 <span class="k">open</span> play/index.html<span class="k">?solo=1</span>
 
 <span class="c"># the whole mechanic, headless</span>
-<span class="k">node</span> test-node.js   <span class="c">→ 235 passed</span></pre>
+<span class="k">node</span> test-node.js   <span class="c">→ 247 passed</span></pre>
       </div>
     </div>
     <p class="fine" style="margin-top:20px">The journal lives in
@@ -428,14 +430,14 @@
   <div class="wrap">
     <div class="head"><span class="n">08</span><h2>What it could become</h2><span class="ln"></span></div>
     <ul class="next">
-      <li><b>A menu board for the wall</b><span>The same menu, printed A3 for the counter — no
-        second copy of the prices to keep in step.</span></li>
-      <li><b>The journal in the browser</b><span>Download and restore the shift as a file from the
-        kitchen, so a backup needs no shell and no one who knows what a journal is.</span></li>
-      <li><b>Deeper undo</b><span>Right now the kitchen can step back one move; a short history of
-        the last few, per table, would be kinder at 1 p.m.</span></li>
-      <li><b>Pairing by scan</b><span>The join code carries the address but the guest still types
-        the PIN. A code that carried both would make joining one tap.</span></li>
+      <li><b>Two counters, one building</b><span>A room per counter, so a food court can share a
+        host without sharing a menu.</span></li>
+      <li><b>How the table paid</b><span>Cash or UPI against a table — a field and a total, no
+        gateway, for the day's cash-up.</span></li>
+      <li><b>An alert that survives a reload</b><span>Web notifications, so the kitchen hears an
+        order with the tab in the background and the screen locked.</span></li>
+      <li><b>Hindi on the board, if wanted</b><span>The language layer went by decision in 1.4.0.
+        The dish names are still stored, so it comes back as a UI job, not a migration.</span></li>
     </ul>
   </div>
 </section>
@@ -514,7 +516,7 @@
     });
   }
 
-  document.getElementById("stamp").textContent = "build 1.4.0 · 2026-11-01";
+  document.getElementById("stamp").textContent = "build 1.5.0 · 2026-11-01";
 })();
 </script>
 </body>

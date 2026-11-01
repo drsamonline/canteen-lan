@@ -607,6 +607,21 @@ console.log("Canteen engine " + C.version + " — tests");
   })());
 })();
 
+/* ---- 30. undo has depth ---- */
+(function () {
+  var d = C.newDoc();
+  C.apply(d, { t: "order", id: "u1", table: "2", items: [{ sku: "chai", qty: 1 }] });
+  ok("a fresh order has nothing to undo", C.undoDepth(d) === 0);
+  C.apply(d, { t: "status", id: "u1", status: "preparing" });
+  C.apply(d, { t: "status", id: "u1", status: "served" });
+  ok("two moves, two steps back", C.undoDepth(d) === 2);
+  C.undoLast(d);
+  ok("one step back", C.orderById(d, "u1").status === "preparing" && C.undoDepth(d) === 1);
+  C.undoLast(d);
+  ok("all the way back", C.orderById(d, "u1").status === "placed" && C.undoDepth(d) === 0);
+  ok("nothing left", C.undoLast(d) === null);
+})();
+
 /* ---- 15. live: the room transport carries a real order ---- */
 function get(url, onData) {
   return new Promise(function (resolve) {
@@ -616,6 +631,20 @@ function get(url, onData) {
       res.on("end", resolve);
     });
     req.on("error", function () {});
+  });
+}
+function waitish(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+/* POST a raw body with headers of your choosing */
+function postRaw(url, body, headers) {
+  return new Promise(function (resolve) {
+    var h = Object.assign({ "Content-Type": "application/x-ndjson",
+      "Content-Length": Buffer.byteLength(body) }, headers || {});
+    var req = http.request(url, { method: "POST", headers: h }, function (res) {
+      var b = ""; res.on("data", function (c) { b += c; });
+      res.on("end", function () { resolve({ status: res.statusCode, body: b }); });
+    });
+    req.on("error", function () { resolve({ status: 0, body: "" }); });
+    req.write(body); req.end();
   });
 }
 function post(url, obj) {
@@ -728,6 +757,50 @@ function post(url, obj) {
   ok("the mirror rebuilds the same board", C.replay(hb.history()).orders.length === 1);
   await ha.close();
   await hb.close();
+
+  /* ---- 27. the journal as a file: download it, put it back ---- */
+  var fs3 = require("fs");
+  var os3 = require("os");
+  var tmp3 = fs3.mkdtempSync(path.join(os3.tmpdir(), "canteen-journal-"));
+  var jpath3 = path.join(tmp3, "room.jsonl");
+  var hj = createHost({ room: "journal-test", pin: "7777", journal: jpath3,
+    appDir: path.join(__dirname, "docs", "play"), history: 200, replay: true });
+  var pj = await hj.listen(0);
+  var basej = "http://127.0.0.1:" + pj;
+
+  await post(basej + "/send", { t: "order", id: "j1", table: "5", pin: "7777", items: [{ sku: "chai", qty: 2 }] });
+  await waitish(200);
+
+  var dl = await new Promise(function (resolve) {
+    http.get(basej + "/journal", function (r) {
+      var b = ""; r.on("data", function (c) { b += c; });
+      r.on("end", function () { resolve({ status: r.statusCode, body: b, type: r.headers["content-type"],
+        disp: r.headers["content-disposition"] }); });
+    });
+  });
+  ok("the journal downloads as a file", dl.status === 200 && /ndjson/.test(dl.type || "") &&
+    /attachment; filename="canteen-journal-test.jsonl"/.test(dl.disp || ""));
+  ok("every line of the journal is JSON", dl.body.trim().split("\n").every(function (l) {
+    try { return !!JSON.parse(l); } catch (e) { return false; }
+  }));
+
+  var restoreNoPin = await postRaw(basej + "/journal", dl.body, {});
+  ok("a restore without the pin is refused", restoreNoPin.status === 403);
+  var restore = await postRaw(basej + "/journal", dl.body, { "X-Room-Pin": "7777" });
+  ok("a restore with the pin is accepted", restore.status === 200 && JSON.parse(restore.body).ok === true);
+  ok("the restore reports what it took",
+    JSON.parse(restore.body).restored === dl.body.trim().split("\n").length);
+  await waitish(200);
+  /* /state belongs to the canteen host; here the board is rebuilt from the journal */
+  var board = C.replay(hj.history());
+  ok("a restored order is not charged twice", board.orders.length === 1 &&
+    C.stats(board).revenue === 3000);
+  ok("a broken line is refused, not fatal", (await (async function () {
+    var r = await postRaw(basej + "/journal", "not json\n" + dl.body, { "X-Room-Pin": "7777" });
+    return JSON.parse(r.body);
+  })()).refused === 1);
+  await hj.close();
+  fs3.rmSync(tmp3, { recursive: true, force: true });
 
   /* the journal is a plain JSONL file: no database, nothing to install */
   var lines = fs2.readFileSync(jpath, "utf8").trim().split("\n");

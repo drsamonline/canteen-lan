@@ -140,7 +140,7 @@ function createHost(opts) {
   const server = http.createServer(function (req, res) {
     const url = new URL(req.url, "http://localhost");
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Headers", "content-type");
+    res.setHeader("Access-Control-Allow-Headers", "content-type, x-room-pin");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 
     if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
@@ -181,6 +181,44 @@ function createHost(opts) {
         broadcast(msg);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, clients: clients.size }));
+      });
+      return;
+    }
+
+    /* The shift as a file. A backup that needs no shell: download the journal
+       from the board, and put it back the same way. */
+    if (url.pathname === "/journal") {
+      if (req.method === "GET") {
+        const body = history.map(function (m) { return JSON.stringify(m); }).join("\n") + "\n";
+        res.writeHead(200, {
+          "Content-Type": "application/x-ndjson; charset=utf-8",
+          "Content-Disposition": 'attachment; filename="canteen-' + room + '.jsonl"',
+          "Cache-Control": "no-cache"
+        });
+        res.end(body);
+        return;
+      }
+      if (req.method !== "POST") { res.writeHead(405); res.end(); return; }
+      let body = "";
+      req.on("data", function (c) { body += c; if (body.length > 8e6) req.destroy(); });
+      req.on("end", function () {
+        if (pin && String(req.headers["x-room-pin"] || "") !== pin) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: "pin" }));
+          return;
+        }
+        const lines = String(body).split("\n").filter(function (l) { return l.trim(); });
+        let restored = 0, refused = 0;
+        lines.slice(-5000).forEach(function (line) {
+          let m;
+          try { m = JSON.parse(line); } catch (e) { refused++; return; }
+          if (!m || typeof m !== "object" || Array.isArray(m)) { refused++; return; }
+          delete m.pin; delete m._via;
+          broadcast(m);              /* journals it, applies it, tells every client */
+          restored++;
+        });
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, restored: restored, refused: refused }));
       });
       return;
     }

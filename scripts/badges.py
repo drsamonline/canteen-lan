@@ -23,7 +23,7 @@ SLATE = "#3d4650"
 
 BADGES = [
     ("live", "live", "online", GREEN),
-    ("tests", "tests", "235 passing", GREEN),
+    ("tests", "tests", "247 passing", GREEN),
     ("deps", "deps", "0 runtime", SLATE),
     ("offline", "offline", "no network", INK),
     ("licence", "licence", "PolyForm NC 1.0.0", AMBER),

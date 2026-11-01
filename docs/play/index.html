@@ -198,9 +198,11 @@
             <div></div>
           </div>
           <div class="tags" id="miTags" style="margin-top:10px"></div>
+          <p class="mut" style="font-size:12.5px;margin:0 0 8px" id="miHint"></p>
           <div class="row" style="margin-top:10px">
             <button id="miSave" class="primary sm"></button>
             <button id="miReset" class="ghost sm"></button>
+            <button id="boardBtn" class="ghost sm"></button>
             <span id="miMsg" class="mut" style="font-size:12.5px"></span>
           </div>
         </div>
@@ -212,7 +214,14 @@
         <div class="row" style="margin-top:10px">
           <button id="printReport" class="sm"></button>
           <button id="printA4" class="sm ghost"></button>
+          <button id="boardBtn2" class="sm ghost"></button>
         </div>
+        <div class="row" style="margin-top:8px">
+          <button id="backupBtn" class="sm ghost"></button>
+          <button id="restoreBtn" class="sm ghost"></button>
+          <input id="restoreFile" type="file" accept=".jsonl,.json,.txt,application/json,text/plain" hidden>
+        </div>
+        <p class="mut" id="backupMsg" style="font-size:12.5px;margin:8px 0 0"></p>
       </div>
     </div>
   </section>
@@ -255,15 +264,16 @@
           each: "each", covers: "Covers", average: "Average ticket", topItems: "Top sellers",
           printReport: "Print report", sound: "Sound", queued: "queued",
           newOrder: "New order", minutes: "min", edit: "Edit", del: "Delete", avail: "Available",
-          printerOff: "No printer on the room host — this prints through your browser.",
           soloHint: "One device runs the whole canteen. Nothing leaves this phone or laptop.",
           joinHint: "The host prints this address when it starts. Leave the PIN empty if the room has none.",
           menuHint: "Changes go to every device in the room at once. A sold-out item stays on bills already placed.",
           floor: "Floor", slip: "Bill slip", showSlip: "Show my bill", hideSlip: "Hide the slip",
           stock: "Stock (blank = unlimited)", left: "left", lowStock: "Running out",
           from: "Served from (0–23)", to: "until (0–23)", opts: "Modifiers, name:price",
-          unlimited: "unlimited", printSlip: "Print the slip", tileOpen: "open",
-          printA4: "Print A4 sheet", sheet: "Shift report" },
+          printSlip: "Print the slip", tileOpen: "open",
+          printA4: "Print A4 sheet", sheet: "Shift report",
+          menuBoard: "Print menu board (A3)", backup: "Download the shift",
+          restore: "Restore from a file", allDay: "Served all day", prices: "prices in rupees" },
   };
   L.i18n.extend("en", S.en);
   function t(k) { return L.i18n.t(k); }
@@ -285,7 +295,7 @@
   var me = L.storage.get("canteen:me", {});
   var client = null, heads = {}, filter = "", editing = "", soundOn = L.storage.get("canteen:sound", false);
   var outbox = L.storage.get("canteen:outbox", []);
-  var floorSel = "", slipOpen = false, sheetOnly = false;
+  var floorSel = "", slipOpen = false, sheetOnly = false, boardOnly = false;
   var seenOrders = {}, seenCalls = {};
 
   /* ---- mode ----
@@ -295,13 +305,19 @@
   var qs = new URLSearchParams(location.search);
   var demo = qs.get("demo") === "1";
   var solo = qs.get("solo") === "1";
-  var BUILD = "1.4.0 · 2026-11-01";
+  var BUILD = "1.5.0 · 2026-11-01";
 
   /* ---- boot ---- */
   L.theme.apply();
   L.seo.title("Canteen — order from your table");
   L.seo.description("Order from your table over the room's own Wi-Fi.");
   L.i18n.setLang("en");   /* the board ships English only */
+
+  /* A scanned join code carries ?pin= (and ?host= when the board is published),
+     so the guest lands already pointed at the room. */
+  var qPin = qs.get("pin"), qHost = qs.get("host"), autoJoin = false;
+  if (qPin) me.pin = qPin;
+  if (qHost) me.host = qHost;
 
   $("name").value = me.name || "";
   $("table").value = me.table || "";
@@ -325,6 +341,7 @@
     if (qs.get("tab") === "floor") tab = "floor";
     if (qs.get("slip") === "1") slipOpen = true;
     if (qs.get("sheet") === "1") { kitchen = true; tab = "report"; sheetOnly = true; }
+    if (qs.get("board") === "1") { kitchen = true; tab = "menu"; boardOnly = true; }
     me = { name: "Aarti", table: qs.get("table") || "12", host: "", pin: "" };
     banner("Demo board — sample orders seeded in this page. " +
       (kitchen ? "Press Preparing / Served to move them along." : "Add to the cart and place the order.") +
@@ -359,6 +376,11 @@
   $("exportBtn").addEventListener("click", exportCSV);
   $("printReport").addEventListener("click", function () { printReport(); });
   $("printA4").addEventListener("click", function () { printA4(); });
+  $("boardBtn").addEventListener("click", function () { printMenuBoard(); });
+  $("boardBtn2").addEventListener("click", function () { printMenuBoard(); });
+  $("backupBtn").addEventListener("click", downloadShift);
+  $("restoreBtn").addEventListener("click", function () { $("restoreFile").click(); });
+  $("restoreFile").addEventListener("change", restoreShift);
   $("slipBtn").addEventListener("click", function () { slipOpen = !slipOpen; render(); });
   $("miSave").addEventListener("click", saveItem);
   $("miReset").addEventListener("click", function () { editing = ""; fillItemForm(null); });
@@ -394,12 +416,15 @@
     $("lItemStock").textContent = t("stock");
     $("lItemFrom").textContent = t("from"); $("lItemTo").textContent = t("to");
     $("lItemOpts").textContent = t("opts");
+    $("miHint").textContent = t("menuHint");
     $("clearBtn").textContent = t("clear"); $("exportBtn").textContent = t("export");
     $("undoBtn").textContent = "↶ " + t("undo");
     $("lItemName").textContent = t("itemName"); $("lItemPrice").textContent = t("price");
     $("lItemSku").textContent = t("sku"); $("miSave").textContent = t("save"); $("miReset").textContent = t("reset");
     $("printReport").textContent = t("printReport");
     $("printA4").textContent = t("printA4");
+    $("boardBtn").textContent = t("menuBoard"); $("boardBtn2").textContent = t("menuBoard");
+    $("backupBtn").textContent = t("backup"); $("restoreBtn").textContent = t("restore");
     paintFilters();
   }
 
@@ -534,6 +559,58 @@
     printDocket((kind === "bill" ? "BILL · " : "KOT · ") + t("table") + " " + o.table,
       lines, (o.by || "") + (o.note ? " · " + o.note : ""));
   }
+  /* ---- the shift as a file: no shell, no database, no backup job ---- */
+  function saveFile(name, text, mime) {
+    var blob = new Blob([text], { type: (mime || "text/plain") + ";charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  }
+
+  function hostBase() { return String(me.host || "").replace(/\/+$/, ""); }
+
+  function downloadShift() {
+    if (status === "on" && hostBase()) {
+      /* the room's own journal: every message, in order */
+      window.open(hostBase() + "/journal", "_blank");
+      $("backupMsg").textContent = "The room's journal is on its way from " + hostBase() + ".";
+      return;
+    }
+    saveFile("canteen-shift.json", C.toJSON(doc), "application/json");
+    $("backupMsg").textContent = "Saved this board as a snapshot.";
+  }
+
+  function restoreShift(ev) {
+    var file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var text = String(reader.result || "");
+      if (status === "on" && hostBase()) {
+        fetch(hostBase() + "/journal", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-ndjson", "X-Room-Pin": me.pin || "" },
+          body: text
+        }).then(function (r) { return r.json(); }).then(function (j) {
+          $("backupMsg").textContent = j.ok
+            ? "Restored " + j.restored + " message(s)" + (j.refused ? ", " + j.refused + " refused" : "") + "."
+            : "The room refused it: " + j.error;
+        }).catch(function () { $("backupMsg").textContent = "Could not reach the room host."; });
+        return;
+      }
+      try {
+        doc = C.fromJSON(text);
+        if (status === "solo") persistSolo();
+        $("backupMsg").textContent = "Restored the board from a snapshot.";
+        render();
+      } catch (e) { $("backupMsg").textContent = "That file is not a Canteen snapshot."; }
+    };
+    reader.readAsText(file);
+    ev.target.value = "";
+  }
+
   /* The same shift, on A4, for the accounts: figures, what sold, what each table
    * ran up, and what is nearly gone. */
   function buildA4() {
@@ -575,7 +652,60 @@
     return html;
   }
 
-  function printA4() { buildA4(); window.print(); }
+  /* One page, any paper: the @page size is injected for this print only. */
+  function setPageSize(size) {
+    var old = document.getElementById("pageSize");
+    if (old) old.parentNode.removeChild(old);
+    var st = document.createElement("style");
+    st.id = "pageSize";
+    st.textContent = "@page{size:" + (size || "A4") + ";margin:14mm}";
+    /* appended to the body, after the app's own stylesheet, or that one wins */
+    document.body.appendChild(st);
+  }
+
+  function printSheet(html, size) {
+    setPageSize(size);
+    $("printArea").innerHTML = html;
+    window.print();
+    setTimeout(function () { var x = document.getElementById("pageSize"); if (x) x.parentNode.removeChild(x); }, 1500);
+  }
+
+  function printA4() { printSheet(buildA4(), "A4"); }
+
+  /* The menu for the wall: A3, two columns, the same prices the board is running. */
+  function buildMenuBoard() {
+    var groups = {}, order = [];
+    doc.menu.forEach(function (m) {
+      var g = m.window ? windowLabel(m.window) : t("allDay");
+      if (!groups[g]) { groups[g] = []; order.push(g); }
+      groups[g].push(m);
+    });
+    order.sort(function (a, b) {
+      if (a === t("allDay")) return -1;
+      if (b === t("allDay")) return 1;
+      return a.localeCompare(b);
+    });
+    var html = '<div class="a3"><h1>' + esc(roomName()) + " — " + esc(t("menu")) + "</h1>" +
+      '<div class="meta">' + esc(stamp()) + " · " + esc(t("prices")) + "</div>";
+    order.forEach(function (g) {
+      html += "<h2>" + esc(g) + '</h2><div class="cols">';
+      groups[g].slice().sort(function (a, b) { return a.price - b.price || a.name.localeCompare(b.name); })
+        .forEach(function (m) {
+          var sub = [];
+          if ((m.tags || []).length) sub.push(m.tags.join(" · "));
+          if ((m.options || []).length) sub.push(m.options.map(function (o) {
+            return o.name + (o.price ? " +" + C.money(o.price) : ""); }).join(" · "));
+          if (m.soldOut || m.stock === 0) sub.push(t("soldOut"));
+          html += '<div class="dish"><span class="nm">' + esc(m.name) + '</span><span class="dots"></span>' +
+            '<span class="pr">' + C.money(m.price) + "</span>" +
+            (sub.length ? '<span class="sub">' + esc(sub.join(" · ")) + "</span>" : "") + "</div>";
+        });
+      html += "</div>";
+    });
+    return html + "</div>";
+  }
+
+  function printMenuBoard() { printSheet(buildMenuBoard(), "A3"); }
 
   /* dd/mm/yyyy hh:mm — the room is in India, and an A4 sheet is read on paper */
   function stamp() {
@@ -791,6 +921,10 @@
       stat(t("revenue"), C.money(st.revenue)) + stat(t("soldOut"), st.soldOut) +
       stat(t("menuTab"), st.menu);
 
+    var depth = C.undoDepth(doc);
+    $("undoBtn").textContent = "↶ " + t("undo") + (depth ? " (" + depth + ")" : "");
+    $("undoBtn").disabled = depth === 0;
+
     ["orders", "calls", "floor", "menu", "report"].forEach(function (k) {
       var b = $("tab" + k.charAt(0).toUpperCase() + k.slice(1));
       b.className = (tab === k ? "primary " : "ghost ") + "sm";
@@ -999,7 +1133,11 @@
 
   fillItemForm(null);
   paintStatus(); label(); render();
-  if (sheetOnly) buildA4();
+  if (sheetOnly) { setPageSize("A4"); $("printArea").innerHTML = buildA4(); }
+  if (boardOnly) { setPageSize("A3"); $("printArea").innerHTML = buildMenuBoard(); }
+
+  /* one tap becomes none: the code already carried the room */
+  if (qPin && !demo && !solo && $("host").value) join();
 })();
 </script>
 
@@ -1052,6 +1190,19 @@ window.addEventListener("error", function () { window.__bootError = true; });
   #printArea .a4 td{border-bottom:1px solid #ddd;padding:4px 6px;font-size:12px}
   #printArea .a4 td.n,#printArea .a4 th.n{text-align:right;font-variant-numeric:tabular-nums}
   @page{size:A4;margin:16mm}
+  #printArea{background:#fff;color:#000}
+  #printArea .a3{font:17px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#000}
+  #printArea .a3 h1{font-size:40px;margin:0 0 2px;letter-spacing:-.02em}
+  #printArea .a3 .meta{color:#555;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px}
+  #printArea .a3 h2{font-size:12.5px;letter-spacing:.18em;text-transform:uppercase;color:#555;
+       border-bottom:1px solid #999;padding-bottom:4px;margin:20px 0 8px}
+  #printArea .a3 .cols{columns:2;column-gap:14mm}
+  #printArea .a3 .dish{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;break-inside:avoid;
+       padding:5px 0;font-size:17px}
+  #printArea .a3 .dish .nm{font-weight:600}
+  #printArea .a3 .dish .dots{flex:1;border-bottom:1px dotted #999;height:1em;min-width:12px}
+  #printArea .a3 .dish .pr{font-variant-numeric:tabular-nums;font-weight:600}
+  #printArea .a3 .dish .sub{flex:0 0 100%;color:#555;font-size:12.5px;margin:-3px 0 0}
   @media print{
     body>*:not(#printArea){display:none !important}
     #printArea{display:block !important}

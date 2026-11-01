@@ -72,6 +72,8 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   ok("GET /qr.svg draws a scannable code", qr.status === 200 && /^<svg/.test(qr.body));
   const join = await get(A, "/join");
   ok("GET /join is a page a phone can scan", join.status === 200 && /Scan to order/.test(join.body) && join.body.indexOf(PIN) !== -1);
+  ok("the join code carries the room PIN, so scanning joins in one step",
+    join.body.indexOf("?pin=" + PIN) !== -1);
   const escape = await get(A, "/../../etc/passwd");
   ok("a path cannot escape the app directory", escape.status === 403 || escape.status === 404);
 
@@ -126,6 +128,36 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   ok("the mirror rebuilds the same bill", mirrored.stats.revenue === 3000 + 4500);
   live.kill();
   standby.kill();
+  await wait(200);
+
+  /* ---- the shift as a file, through the real host ---- */
+  const D = 18093;
+  const jhost = spawn("node", ["host/room.js", "--port", String(D), "--pin", PIN, "--data", data], { cwd: REPO });
+  jhost.stdout.on("data", function () {});
+  jhost.stderr.on("data", function () {});
+  await wait(1400);
+  const journal = await new Promise(function (resolve) {
+    http.get("http://127.0.0.1:" + D + "/journal", function (r) {
+      let b = ""; r.on("data", function (c) { b += c; });
+      r.on("end", function () { resolve({ status: r.statusCode, body: b, disp: r.headers["content-disposition"] }); });
+    });
+  });
+  ok("the shift downloads as a journal file", journal.status === 200 && /canteen-canteen\.jsonl/.test(journal.disp || ""));
+  const before = JSON.parse((await get(D, "/state")).body).orders.length;
+  const restored = await new Promise(function (resolve) {
+    const body = journal.body;
+    const req = http.request({ host: "127.0.0.1", port: D, path: "/journal", method: "POST",
+      headers: { "Content-Type": "application/x-ndjson", "Content-Length": Buffer.byteLength(body),
+                 "X-Room-Pin": PIN } },
+      function (r) { let b = ""; r.on("data", function (c) { b += c; }); r.on("end", function () { resolve(JSON.parse(b)); }); });
+    req.on("error", function () { resolve({ ok: false }); });
+    req.write(body); req.end();
+  });
+  ok("the journal can be put back", restored.ok === true && restored.restored > 0);
+  const afterRestore = JSON.parse((await get(D, "/state")).body);
+  ok("putting it back does not double-charge the shift",
+    afterRestore.orders.length === before, before + " -> " + afterRestore.orders.length);
+  jhost.kill();
   await wait(200);
 
   const lines = fs.readFileSync(path.join(data, "room-canteen.jsonl"), "utf8").trim().split("\n");

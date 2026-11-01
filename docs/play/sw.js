@@ -9,7 +9,7 @@
  */
 "use strict";
 
-var CACHE = "canteen-1.4.0";
+var CACHE = "canteen-1.5.0";
 var ASSETS = [
   "./",
   "index.html",

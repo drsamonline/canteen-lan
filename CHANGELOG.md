@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.5.0 — 2026-11-01
+
+The last four, and then an audit.
+
+- **A menu board for the wall.** *Print menu board (A3)* draws the same menu the board is
+  running — grouped by serving window, two columns, dotted leaders, tags and modifier
+  prices — on A3. One copy of the prices, no second document to keep in step. The `@page`
+  size is injected per print, so A4 sheets and the A3 board share one print path.
+- **The journal in the browser.** `/journal` on the room host downloads the shift as a
+  `.jsonl`, and posting the same file back restores it — pin-checked, capped at 5000 lines
+  and 8 MB, bad lines counted and skipped, orders idempotent so a re-import cannot
+  double-charge a table. Solo boards download and restore a snapshot instead. A backup now
+  needs no shell and nobody who knows what a journal is.
+- **Deeper undo.** The kitchen button carries the number of moves still undoable
+  (`Canteen.undoDepth()`), and each press steps back through the shift's status log rather
+  than one blind tap.
+- **Pairing by scan.** The join code now carries the PIN as well as the address
+  (`http://…:8080/?pin=4821`), and the board reads `?pin=` / `?host=` and joins itself. Scan,
+  and the guest is in the room.
+- **The audit found four things, all fixed.** Two dead strings (`printerOff`, `unlimited`)
+  removed and the menu hint put to work under the editor; the journal route moved out of
+  `room.js` and into `lan-host.js`, where the journal actually lives, so it exists for any
+  host and not only the canteen one; the sheet background was inheriting the app's warm
+  canvas instead of printing on white; and the injected `@page` rule lost to the app's own
+  stylesheet until it was appended after it.
+- **`scripts/link-check.js`** — every relative link and image on the landing page and the
+  README must resolve, and every in-page anchor must have a heading or id. It runs in CI,
+  so a renamed file cannot quietly break a badge.
+- Tests: 235 → 247; the host smoke test 25 → 29 (the pin-carrying code, and a journal
+  round-trip through the real host).
+
+## 1.4.0 — 2026-11-01
+
 ## 1.4.0 — 2026-11-01
 
 The last four items, and one decision: **the board is English only.** The language

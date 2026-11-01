@@ -36,8 +36,9 @@ kitchen sees every open order grouped by table with the running bill and the min
 has waited, or as a **floor** of tiles it can tap; marks one *preparing*, *served* or
 *cancelled*, **undoes** a wrong tap, **splits a table's bill** across heads in exact paise,
 prints a KOT or bill, edits the menu with its **stock counts**, **modifiers** and
-**serving windows**, reads the **shift report** — as a screen or an **A4 sheet** — and
-exports the day as CSV.
+**serving windows**, prints the **menu board for the wall** on A3, reads the **shift
+report** — as a screen or an **A4 sheet** — and exports the day as CSV. The shift downloads
+as a file and can be put back from the board, so a backup needs no shell.
 
 It keeps working when the Wi-Fi does not: a service worker holds the shell, and anything
 sent while the room is unreachable waits in an outbox and is re-sent on reconnect — with
@@ -98,15 +99,17 @@ laptop dies; forwarded messages are marked and never re-forwarded, so two hosts 
 loop at each other. `--mirror-pin` is for a peer that does not share the room's PIN.
 
 It serves the board itself at `/`, prints the LAN address, and draws a QR in the terminal
-for a guest to scan. Also on offer: `/join` (a scannable page), `/qr.svg`, `/state`,
-`/report`, and `/print`.
+for a guest to scan — the code carries the room PIN, so scanning joins in one step. Also on
+offer: `/join` (a scannable page), `/qr.svg`, `/state`, `/report`, `/print`, and `/journal`
+(GET the shift as a `.jsonl`, POST it back to restore).
 
 The journal is `.canteen/room-<room>.jsonl` — one JSON object per message. A restart
 replays the shift instead of losing it, and the menu comes back as the kitchen left it.
 
 ```
-node test-node.js             # 235 passed — engine, transport, page
-node scripts/smoke-host.js    # 25 passed — the real host, across a restart and a mirror
+node test-node.js             # 247 passed — engine, transport, page
+node scripts/smoke-host.js    # 29 passed — the real host, across a restart and a mirror
+node scripts/link-check.js    # 34 passed — every local link and anchor resolves
 ```
 
 No host at all? `docs/play/index.html?solo=1` runs the whole canteen on one device, with
@@ -136,7 +139,8 @@ The app is thin on purpose, and every part it stands on is **in the repository**
   one language is easier to keep honest than three, and it is the one the thermal roll can
   print. The engine still stores an optional `names` field, so a Hindi board would be a UI
   job later rather than a data migration.
-- `host/lan-host.js` — the room: SSE, POST, a PIN check, a journal, and static serving.
+- `host/lan-host.js` — the room: SSE, POST, a PIN check, the journal (including `/journal`
+  download and restore), an optional mirror, and static serving.
 - `host/room.js` — the canteen host: journal replay, `/join`, `/qr.svg`, `/state`,
   `/report`, `/print`, and a KOT to a thermal printer on every order.
 - `docs/play/qr.js` — a real QR encoder (byte mode, versions 1–4, ECC L): bit stream,
@@ -147,7 +151,11 @@ The app is thin on purpose, and every part it stands on is **in the repository**
   because a hand-rolled encoder is exactly the code that looks right and scans wrong.
 - `host/print.js` — ESC/POS over a TCP socket, 32 columns, no driver and no CUPS.
 - `scripts/smoke-host.js` — starts `host/room.js` as a real process, drives its routes
-  over HTTP, kills it, starts it again and checks the shift and the menu came back.
+  over HTTP, kills it, starts it again and checks the shift and the menu came back, then
+  brings a mirror up beside it and round-trips the journal.
+- `scripts/link-check.js` — every relative link, image and in-page anchor on the landing
+  page and the README resolves; it runs in CI, so a renamed file cannot break a badge
+  quietly.
 
 Every message is sanitised on arrival (SKUs, quantities, tables, statuses, tags, languages
 and calls are validated and clamped) and **prices are taken from the room's menu, never
