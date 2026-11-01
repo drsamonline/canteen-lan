@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.4.0 — 2026-11-01
+
+The last four items, and one decision: **the board is English only.** The language
+selector, the Hindi and Gujarati tables and the `names` lookup in the UI are gone — one
+language is easier to keep honest than three, and it removes the one thing the thermal
+printer could not do (a Devanagari bitmap font). Dish names stay English everywhere,
+including on the roll. The engine still *stores* an optional `names` field, so a Hindi
+board is a UI job later, not a data migration.
+
+- **Priced modifiers.** A dish carries its own options — `Extra chutney:10, No sugar:0` —
+  set in the menu editor as `name:price` pairs. The guest picks them per dish, the cart
+  keeps "chai" and "chai + elaichi" as two lines, and the price is taken from the dish's
+  own list, never from the message, so a peer cannot price its own modifier. Modifiers
+  reach the order card, the KOT, the slip, the CSV and the report.
+- **A menu that keeps time.** A dish can carry a serving window (`from` 6, `to` 11; a
+  window may wrap past midnight). The guest menu follows the clock and says how many
+  dishes are off it at this hour; the seeded menu now demonstrates it with poha (06–11)
+  and thali (12–16). The window is a display rule — an order already placed is never
+  re-priced or refused by the clock.
+- **The shift on A4.** *Print A4 sheet* renders the report as a page for the accounts:
+  covers, revenue, average ticket, cancellations, top sellers, each table's total and
+  what is running out — `@page A4`, dd/mm/yyyy, printed from the browser.
+- Tests: 211 → 235 (modifiers, windows, and the rule that a peer cannot price one).
+
+## 1.3.0 — 2026-11-01
+
 ## 1.3.0 — 2026-11-01
 
 The four things the last release said it could become, and nothing else.

@@ -506,6 +506,107 @@ console.log("Canteen engine " + C.version + " — tests");
   ok("an empty table has an empty slip", C.billSlip(d, "99").total === 0);
 })();
 
+/* ---- 28. priced modifiers ---- */
+(function () {
+  var d = C.newDoc();
+  var chai = C.menuItem(d, "chai");
+  ok("the seeded menu carries modifiers", chai.options.length === 2 && chai.options[0].price === 500);
+  ok("an option needs a code", C.normOption({ name: "x", price: 100 }) === null);
+  ok("options dedupe on code", C.normOptions([{ code: "a", name: "A" }, { code: "a", name: "B" }]).length === 1);
+  ok("options are capped", C.normOptions(["a", "b", "c", "d", "e", "f", "g"].map(function (k) {
+    return { code: k, name: k }; })).length === 6);
+
+  ok("an order keeps the modifier and its price", (function () {
+    var e = C.newDoc();
+    C.apply(e, { t: "order", id: "m1", table: "1", items: [{ sku: "chai", qty: 2, opts: ["elaichi"] }] });
+    var l = e.orders[0].items[0];
+    return l.opts.length === 1 && l.opts[0].name === "Elaichi" && l.add === 500 && C.totalOf(e.orders[0]) === 4000;
+  })());
+
+  ok("a modifier the dish does not offer is dropped", (function () {
+    var e = C.newDoc();
+    C.apply(e, { t: "order", id: "m2", table: "1", items: [{ sku: "chai", qty: 1, opts: ["gold-leaf"] }] });
+    return e.orders[0].items[0].opts === undefined;
+  })());
+
+  ok("a peer cannot price its own modifier", (function () {
+    var e = C.newDoc();
+    C.apply(e, { t: "order", id: "m3", table: "1",
+      items: [{ sku: "chai", qty: 1, opts: [{ code: "elaichi", name: "Elaichi", price: 999999 }] }] });
+    return C.totalOf(e.orders[0]) === 2000;
+  })());
+
+  ok("the same dish with and without a modifier are two lines", (function () {
+    var e = C.newDoc();
+    C.apply(e, { t: "order", id: "m4", table: "1", items: [
+      { sku: "chai", qty: 1 }, { sku: "chai", qty: 1, opts: ["sugar"] }] });
+    return e.orders[0].items.length === 2 && C.totalOf(e.orders[0]) === 3000;
+  })());
+
+  ok("the slip keeps the variants apart", (function () {
+    var e = C.newDoc();
+    C.apply(e, { t: "order", id: "m5", table: "1", items: [{ sku: "chai", qty: 1, opts: ["elaichi"] }] });
+    C.apply(e, { t: "order", id: "m6", table: "1", items: [{ sku: "chai", qty: 2 }] });
+    var slip = C.billSlip(e, "1");
+    return slip.lines.length === 2 && slip.total === 2000 + 3000;
+  })());
+
+  ok("the CSV export names the modifiers", (function () {
+    var e = C.newDoc();
+    C.apply(e, { t: "order", id: "m7", table: "1", items: [{ sku: "chai", qty: 1, opts: ["elaichi"] }] });
+    return C.orderToRow(e.orders[0]).items === "1x Masala chai (Elaichi)";
+  })());
+
+  ok("modifier money reaches the report", (function () {
+    var e = C.newDoc();
+    C.apply(e, { t: "order", id: "m8", table: "1", items: [{ sku: "chai", qty: 2, opts: ["elaichi"] }] });
+    return C.report(e).revenue === 4000 && C.report(e).top[0].revenue === 4000;
+  })());
+
+  ok("a modifier survives a snapshot", (function () {
+    var e = C.newDoc();
+    C.apply(e, { t: "order", id: "m9", table: "1", items: [{ sku: "chai", qty: 1, opts: ["elaichi"] }] });
+    var back = C.fromJSON(C.toJSON(e));
+    return back.orders[0].items[0].opts.length === 1 && C.totalOf(back.orders[0]) === 2000;
+  })());
+})();
+
+/* ---- 29. a menu that keeps time ---- */
+(function () {
+  var d = C.newDoc();
+  var poha = C.menuItem(d, "poha"), thali = C.menuItem(d, "thali");
+  ok("the seeded menu has a breakfast window", poha.window.from === 6 && poha.window.to === 11);
+  ok("served inside the window", C.servesAt(poha, 8) === true);
+  ok("not served after it", C.servesAt(poha, 15) === false);
+  ok("the edge hour belongs to the next dish", C.servesAt(thali, 12) === true && C.servesAt(thali, 11) === false);
+  ok("an all-day dish has no window", C.servesAt(C.menuItem(d, "idli"), 3) === true);
+  ok("a window can wrap past midnight", (function () {
+    var late = { window: { from: 22, to: 4 } };
+    return C.servesAt(late, 23) && C.servesAt(late, 2) && !C.servesAt(late, 12);
+  })());
+  ok("a half window works", (function () {
+    return C.servesAt({ window: { from: null, to: 11 } }, 9) &&
+      !C.servesAt({ window: { from: null, to: 11 } }, 12) &&
+      C.servesAt({ window: { from: 17, to: null } }, 20);
+  })());
+  ok("hours are validated", C.normHour(23) === 23 && C.normHour(24) === null && C.normHour("x") === null);
+  ok("the guest menu follows the clock", (function () {
+    var at9 = C.searchMenu(d, "", { hour: 9 }).map(function (m) { return m.sku; });
+    var at15 = C.searchMenu(d, "", { hour: 15 }).map(function (m) { return m.sku; });
+    return at9.indexOf("poha") >= 0 && at15.indexOf("poha") === -1 && at15.indexOf("thali") >= 0;
+  })());
+  ok("without an hour nothing is hidden", C.searchMenu(d, "").length === d.menu.length);
+  ok("availableMenu takes the hour too", (function () {
+    return C.availableMenu(d, 9).some(function (m) { return m.sku === "poha"; }) &&
+      !C.availableMenu(d, 15).some(function (m) { return m.sku === "poha"; });
+  })());
+  ok("the window does not block an order already placed", (function () {
+    var e = C.newDoc();
+    C.apply(e, { t: "order", id: "w1", table: "1", items: [{ sku: "poha", qty: 1 }] });
+    return C.billSlip(e, "1").total === 3500;      /* the clock is a display rule */
+  })());
+})();
+
 /* ---- 15. live: the room transport carries a real order ---- */
 function get(url, onData) {
   return new Promise(function (resolve) {

@@ -10,7 +10,8 @@
 **Order from your table over the room's own Wi-Fi.** One laptop hosts the canteen and
 serves the board itself; every phone on the network joins it, orders from its seat, and
 the kitchen watches each table move from *placed* to *served*. No internet, no accounts,
-no telemetry, no dependency at runtime.
+no telemetry, no dependency at runtime — and the board speaks English, one language, so
+nothing can drift out of sync with itself.
 
 **[Open the board](https://drsamonline.github.io/canteen-lan/play/)** ·
 **[The landing page](https://drsamonline.github.io/canteen-lan/)** ·
@@ -28,13 +29,15 @@ no telemetry, no dependency at runtime.
 
 ## What it does
 
-A guest picks a table and a name, searches or filters the menu, adds items to a cart that
-survives a reload, and places the order with a note — then taps *Show my bill* for an
-itemised slip with a QR the counter can read. The kitchen sees every open order grouped by
-table with the running bill and the minutes each has waited, or as a **floor** of tiles it
-can tap; marks one *preparing*, *served* or *cancelled*, **undoes** a wrong tap, **splits a
-table's bill** across heads in exact paise, prints a KOT or bill, edits the menu and its
-**stock counts**, reads the **shift report**, and exports the day as CSV.
+A guest picks a table and a name, searches or filters the menu, picks **priced modifiers**
+(*Elaichi +₹5*), adds items to a cart that survives a reload, and places the order with a
+note — then taps *Show my bill* for an itemised slip with a QR the counter can read. The
+kitchen sees every open order grouped by table with the running bill and the minutes each
+has waited, or as a **floor** of tiles it can tap; marks one *preparing*, *served* or
+*cancelled*, **undoes** a wrong tap, **splits a table's bill** across heads in exact paise,
+prints a KOT or bill, edits the menu with its **stock counts**, **modifiers** and
+**serving windows**, reads the **shift report** — as a screen or an **A4 sheet** — and
+exports the day as CSV.
 
 It keeps working when the Wi-Fi does not: a service worker holds the shell, and anything
 sent while the room is unreachable waits in an outbox and is re-sent on reconnect — with
@@ -62,8 +65,14 @@ panel to log into and no database to migrate.
 
 Two rules make it safe to edit a live board: a placed order keeps the name and price it
 was ordered at, so changing the menu never rewrites an old bill; and a sold-out item
-leaves the guest menu while staying on the bills already open. Menu items carry a Hindi
-and Gujarati name where the canteen has one, and the guest's language picks it up.
+leaves the guest menu while staying on the bills already open.
+
+A dish can carry **priced modifiers** (`Extra chutney:10, No sugar:0`, set as `name:price`
+pairs) and a **serving window** (`from` 6, `to` 11 — it may wrap past midnight). The guest
+menu follows the clock and says how many dishes are off it at this hour; the window is a
+display rule, so an order already placed is never re-priced or refused by the clock. A
+modifier's price always comes from the dish's own list, never from the message, so a peer
+on the LAN cannot price its own extra.
 
 A dish can also carry a **count** — twelve thalis, not "sold out". An order can only be
 placed as far as the count goes, the count comes off the menu as the order goes on the
@@ -96,7 +105,7 @@ The journal is `.canteen/room-<room>.jsonl` — one JSON object per message. A r
 replays the shift instead of losing it, and the menu comes back as the kitchen left it.
 
 ```
-node test-node.js             # 211 passed — engine, transport, page
+node test-node.js             # 235 passed — engine, transport, page
 node scripts/smoke-host.js    # 25 passed — the real host, across a restart and a mirror
 ```
 
@@ -109,8 +118,8 @@ The app is thin on purpose, and every part it stands on is **in the repository**
 
 - `docs/play/canteen.js` — the engine: the board (menu, orders, table calls, audit log) and
   the twelve-message protocol (`menu`, `menu:set`, `menu:del`, `menu:sold`, `stock:set`,
-  `order`, `status`, `cancel`, `undo`, `clear`, `call`, `ack`), plus the floor plan, the
-  bill slip and the split. Pure, zero-dependency, identical in the browser and under Node,
+  `order`, `status`, `cancel`, `undo`, `clear`, `call`, `ack`), plus priced modifiers,
+  serving windows, the floor plan, the bill slip and the split. Pure, zero-dependency, identical in the browser and under Node,
   so the whole mechanic is tested headlessly.
 - `docs/play/web-kit.js` — the slice of the shared web-kit the app uses (storage, i18n
   EN/HI/GU, CSV, theme, seo, ui), shipped locally. It used to be *assumed* rather than
@@ -123,7 +132,10 @@ The app is thin on purpose, and every part it stands on is **in the repository**
   assets cache-first, cache name bumped per release, and a build stamp in the footer so
   "am I on the new one?" is answerable from the page itself.
 - `docs/play/index.html` — the menu, the cart, the join panel, the kitchen, the floor, the
-  menu editor, the report and the guest's slip.
+  menu editor, the report (screen and A4) and the guest's slip. English only, by decision:
+  one language is easier to keep honest than three, and it is the one the thermal roll can
+  print. The engine still stores an optional `names` field, so a Hindi board would be a UI
+  job later rather than a data migration.
 - `host/lan-host.js` — the room: SSE, POST, a PIN check, a journal, and static serving.
 - `host/room.js` — the canteen host: journal replay, `/join`, `/qr.svg`, `/state`,
   `/report`, `/print`, and a KOT to a thermal printer on every order.

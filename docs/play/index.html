@@ -72,6 +72,10 @@
   .tags{display:flex;flex-wrap:wrap;gap:6px}
   .tags button{font-size:12px;padding:5px 10px;border-radius:999px;background:transparent;color:var(--mut)}
   .tags button.on{color:var(--acc);border-color:var(--acc)}
+  .opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+  .opt{font-size:11.5px;padding:4px 9px;border-radius:999px;background:transparent;
+       color:var(--mut);border:1px solid var(--line);min-height:28px}
+  .opt.on{color:var(--acc);border-color:var(--acc)}
   .floor{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:10px;margin-bottom:6px}
   .tile{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;
         background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 12px;cursor:pointer}
@@ -94,7 +98,6 @@
   <h1>Canteen <span id="tag"></span></h1>
   <div class="row">
     <span id="status" class="mut"><span class="dot"></span> <span id="statusText"></span></span>
-    <select id="lang" aria-label="Language"></select>
     <button id="sound" class="ghost sm" title="Alert sound" aria-pressed="false">♪</button>
     <button id="theme" class="ghost sm" title="Theme">◐</button>
     <button id="viewBtn" class="sm">Kitchen</button>
@@ -132,6 +135,7 @@
       <div class="tags" id="filters"></div>
 
       <h2 id="hMenu"></h2>
+      <div id="offHours" class="mut" style="font-size:12.5px;margin:0 0 8px" hidden></div>
       <div id="menu" class="grid"></div>
 
       <h2 id="hCart"></h2>
@@ -187,6 +191,12 @@
             <div><label id="lItemSku"></label><input id="miSku" placeholder="poha"></div>
             <div><label id="lItemStock"></label><input id="miStock" placeholder="—" inputmode="numeric"></div>
           </div>
+          <div class="form" style="margin-top:10px">
+            <div><label id="lItemFrom"></label><input id="miFrom" placeholder="—" inputmode="numeric"></div>
+            <div><label id="lItemTo"></label><input id="miTo" placeholder="—" inputmode="numeric"></div>
+            <div><label id="lItemOpts"></label><input id="miOpts" placeholder="Extra chutney:10, No sugar:0"></div>
+            <div></div>
+          </div>
           <div class="tags" id="miTags" style="margin-top:10px"></div>
           <div class="row" style="margin-top:10px">
             <button id="miSave" class="primary sm"></button>
@@ -201,6 +211,7 @@
         <div class="card" id="reportBody"></div>
         <div class="row" style="margin-top:10px">
           <button id="printReport" class="sm"></button>
+          <button id="printA4" class="sm ghost"></button>
         </div>
       </div>
     </div>
@@ -250,69 +261,31 @@
           menuHint: "Changes go to every device in the room at once. A sold-out item stays on bills already placed.",
           floor: "Floor", slip: "Bill slip", showSlip: "Show my bill", hideSlip: "Hide the slip",
           stock: "Stock (blank = unlimited)", left: "left", lowStock: "Running out",
-          unlimited: "unlimited", printSlip: "Print the slip", tileOpen: "open" },
-    hi: { tag: "अपनी मेज़ से ऑर्डर करें", join: "कमरे में जुड़ें", name: "आपका नाम", table: "मेज़",
-          host: "होस्ट पता", pin: "रूम पिन", menu: "मेन्यू", cart: "आपका ऑर्डर",
-          note: "टिप्पणी (वैकल्पिक)", place: "ऑर्डर दें", yourtable: "आपकी मेज़ पर",
-          waiter: "वेटर बुलाएँ", bill: "बिल माँगें", kitchen: "रसोई", guest: "ऑर्डर",
-          orders: "ऑर्डर", calls: "कॉल", clear: "परोसे हुए हटाएँ", export: "CSV निर्यात करें",
-          placed: "दिया गया", preparing: "बन रहा है", served: "परोसा गया", cancelled: "रद्द",
-          done: "हो गया", total: "कुल", empty: "अभी कुछ नहीं।",
-          connected: "जुड़ गया", connecting: "जुड़ रहा है…", off: "जुड़ा नहीं",
-          revenue: "कुल बिक्री", open: "बाकी", tables: "मेज़ें", waiterCall: "वेटर बुलाया",
-          billCall: "बिल माँगा", prep: "बनाएँ", serve: "परोसें", cancel: "रद्द करें",
-          items: "वस्तुएँ", solo: "केवल यह डिवाइस", search: "मेन्यू खोजें", all: "सब",
-          soldOut: "खत्म", soldOutShort: "खत्म", menuTab: "मेन्यू", report: "शिफ्ट रिपोर्ट",
-          addItem: "वस्तु जोड़ें", save: "सहेजें", reset: "फ़ॉर्म खाली करें", price: "कीमत (₹)",
-          sku: "एसकेयू (वैकल्पिक)", itemName: "वस्तु का नाम", undo: "पिछला बदलाव हटाएँ",
-          split: "बिल बाँटें", heads: "लोग", each: "प्रति व्यक्ति", covers: "ग्राहक",
-          average: "औसत बिल", topItems: "सबसे ज़्यादा बिके", printReport: "रिपोर्ट छापें",
-          sound: "आवाज़", queued: "कतार में", newOrder: "नया ऑर्डर", minutes: "मिनट",
-          edit: "बदलें", del: "हटाएँ", avail: "उपलब्ध",
-          printerOff: "रूम होस्ट पर प्रिंटर नहीं — ब्राउज़र से छपेगा।",
-          soloHint: "एक ही डिवाइस पूरी कैंटीन चलाए। कुछ भी बाहर नहीं जाता।",
-          joinHint: "होस्ट शुरू होने पर यह पता दिखाता है। पिन खाली छोड़ें अगर रूम में नहीं है।",
-          menuHint: "बदलाव तुरंत सभी डिवाइस पर जाते हैं। खत्म वस्तु पहले दिए बिलों पर रहती है।",
-          floor: "फ़्लोर", slip: "बिल पर्ची", showSlip: "मेरा बिल दिखाएँ", hideSlip: "पर्ची छिपाएँ",
-          stock: "स्टॉक (खाली = असीमित)", left: "बाकी", lowStock: "खत्म होने वाला",
-          unlimited: "असीमित", printSlip: "पर्ची छापें", tileOpen: "बाकी" },
-    gu: { tag: "તમારા ટેબલથી ઓર્ડર કરો", join: "રૂમમાં જોડાઓ", name: "તમારું નામ", table: "ટેબલ",
-          host: "હોસ્ટ સરનામું", pin: "રૂમ પિન", menu: "મેનૂ", cart: "તમારો ઓર્ડર",
-          note: "નોંધ (વૈકલ્પિક)", place: "ઓર્ડર કરો", yourtable: "તમારા ટેબલ પર",
-          waiter: "વેઈટર બોલાવો", bill: "બિલ માંગો", kitchen: "રસોઈ", guest: "ઓર્ડર",
-          orders: "ઓર્ડર", calls: "કૉલ", clear: "પરોસેલા હટાવો", export: "CSV નિકાસ કરો",
-          placed: "આપેલ", preparing: "તૈયાર થાય છે", served: "પરોસ્યું", cancelled: "રદ",
-          done: "થઈ ગયું", total: "કુલ", empty: "હજી કંઈ નથી.",
-          connected: "જોડાયું", connecting: "જોડાઈ રહ્યું છે…", off: "જોડાયું નથી",
-          revenue: "કુલ વેચાણ", open: "બાકી", tables: "ટેબલ", waiterCall: "વેઈટર બોલાવ્યો",
-          billCall: "બિલ માંગ્યું", prep: "તૈયાર કરો", serve: "પરોસો", cancel: "રદ કરો",
-          items: "વસ્તુઓ", solo: "ફક્ત આ ડિવાઇસ", search: "મેનૂ શોધો", all: "બધું",
-          soldOut: "ખતમ", soldOutShort: "ખતમ", menuTab: "મેનૂ", report: "શિફ્ટ રિપોર્ટ",
-          addItem: "વસ્તુ ઉમેરો", save: "સાચવો", reset: "ફોર્મ ખાલી કરો", price: "કિંમત (₹)",
-          sku: "એસકેયુ (વૈકલ્પિક)", itemName: "વસ્તુનું નામ", undo: "છેલ્લો ફેરફાર રદ કરો",
-          split: "બિલ વહેંચો", heads: "વ્યક્તિ", each: "દરેક", covers: "ગ્રાહક",
-          average: "સરેરાશ બિલ", topItems: "સૌથી વધુ વેચાયેલા", printReport: "રિપોર્ટ છાપો",
-          sound: "અવાજ", queued: "કતારમાં", newOrder: "નવો ઓર્ડર", minutes: "મિનિટ",
-          edit: "બદલો", del: "કાઢો", avail: "ઉપલબ્ધ",
-          printerOff: "રૂમ હોસ્ટ પર પ્રિન્ટર નથી — બ્રાઉઝરથી છપાશે.",
-          soloHint: "એક જ ડિવાઇસ આખી કેન્ટીન ચલાવે. કંઈ બહાર જતું નથી.",
-          joinHint: "હોસ્ટ શરૂ થાય ત્યારે આ સરનામું બતાવે છે. પિન ખાલી રાખો જો રૂમમાં ન હોય.",
-          menuHint: "ફેરફાર તરત જ બધા ડિવાઇસ પર જાય છે. ખતમ વસ્તુ પહેલાં આપેલા બિલ પર રહે છે.",
-          floor: "ફ્લોર", slip: "બિલ પરચી", showSlip: "મારું બિલ બતાવો", hideSlip: "પરચી છુપાવો",
-          stock: "સ્ટોક (ખાલી = અમર્યાદિત)", left: "બાકી", lowStock: "ખતમ થવાનું",
-          unlimited: "અમર્યાદિત", printSlip: "પરચી છાપો", tileOpen: "બાકી" }
+          from: "Served from (0–23)", to: "until (0–23)", opts: "Modifiers, name:price",
+          unlimited: "unlimited", printSlip: "Print the slip", tileOpen: "open",
+          printA4: "Print A4 sheet", sheet: "Shift report" },
   };
-  ["en", "hi", "gu"].forEach(function (l) { L.i18n.extend(l, S[l]); });
+  L.i18n.extend("en", S.en);
   function t(k) { return L.i18n.t(k); }
 
   /* ---- state ---- */
   var doc = C.newDoc();            /* the live board, rebuilt from the room's messages */
   var joined = false, kitchen = false, tab = "orders", status = "off";
-  var cart = L.storage.get("canteen:cart", {});
+  /* cart is keyed by dish + chosen modifiers, so "chai" and "chai + elaichi" are
+     two lines. Older saved carts held plain numbers; those are dropped. */
+  var cart = (function () {
+    var saved = L.storage.get("canteen:cart", {}), out = {};
+    Object.keys(saved || {}).forEach(function (k) {
+      var v = saved[k];
+      if (v && typeof v === "object" && v.sku && v.qty > 0) out[k] = { sku: v.sku, qty: v.qty, opts: v.opts || [] };
+    });
+    return out;
+  })();
+  var picks = {};        /* sku -> [option codes] currently chosen on the card */
   var me = L.storage.get("canteen:me", {});
   var client = null, heads = {}, filter = "", editing = "", soundOn = L.storage.get("canteen:sound", false);
   var outbox = L.storage.get("canteen:outbox", []);
-  var floorSel = "", slipOpen = false;
+  var floorSel = "", slipOpen = false, sheetOnly = false;
   var seenOrders = {}, seenCalls = {};
 
   /* ---- mode ----
@@ -322,16 +295,13 @@
   var qs = new URLSearchParams(location.search);
   var demo = qs.get("demo") === "1";
   var solo = qs.get("solo") === "1";
-  var BUILD = "1.3.0 · 2026-11-01";
+  var BUILD = "1.4.0 · 2026-11-01";
 
   /* ---- boot ---- */
   L.theme.apply();
   L.seo.title("Canteen — order from your table");
   L.seo.description("Order from your table over the room's own Wi-Fi.");
-  var langSel = $("lang");
-  L.i18n.langs().forEach(function (l) { langSel.appendChild(L.ui.el("option", { value: l, text: l.toUpperCase() })); });
-  langSel.value = L.i18n.lang;
-  langSel.addEventListener("change", function () { L.i18n.setLang(langSel.value); label(); render(); });
+  L.i18n.setLang("en");   /* the board ships English only */
 
   $("name").value = me.name || "";
   $("table").value = me.table || "";
@@ -354,6 +324,7 @@
     if (qs.get("tab") === "report") tab = "report";
     if (qs.get("tab") === "floor") tab = "floor";
     if (qs.get("slip") === "1") slipOpen = true;
+    if (qs.get("sheet") === "1") { kitchen = true; tab = "report"; sheetOnly = true; }
     me = { name: "Aarti", table: qs.get("table") || "12", host: "", pin: "" };
     banner("Demo board — sample orders seeded in this page. " +
       (kitchen ? "Press Preparing / Served to move them along." : "Add to the cart and place the order.") +
@@ -387,6 +358,7 @@
   $("undoBtn").addEventListener("click", function () { send({ t: "undo", by: me.name }); });
   $("exportBtn").addEventListener("click", exportCSV);
   $("printReport").addEventListener("click", function () { printReport(); });
+  $("printA4").addEventListener("click", function () { printA4(); });
   $("slipBtn").addEventListener("click", function () { slipOpen = !slipOpen; render(); });
   $("miSave").addEventListener("click", saveItem);
   $("miReset").addEventListener("click", function () { editing = ""; fillItemForm(null); });
@@ -420,11 +392,14 @@
     $("tabMenu").textContent = t("menuTab"); $("tabReport").textContent = t("report");
     $("slipBtn").textContent = slipOpen ? t("hideSlip") : t("showSlip");
     $("lItemStock").textContent = t("stock");
+    $("lItemFrom").textContent = t("from"); $("lItemTo").textContent = t("to");
+    $("lItemOpts").textContent = t("opts");
     $("clearBtn").textContent = t("clear"); $("exportBtn").textContent = t("export");
     $("undoBtn").textContent = "↶ " + t("undo");
     $("lItemName").textContent = t("itemName"); $("lItemPrice").textContent = t("price");
     $("lItemSku").textContent = t("sku"); $("miSave").textContent = t("save"); $("miReset").textContent = t("reset");
     $("printReport").textContent = t("printReport");
+    $("printA4").textContent = t("printA4");
     paintFilters();
   }
 
@@ -524,8 +499,9 @@
   }
 
   function placeOrder() {
-    var items = Object.keys(cart).filter(function (k) { return cart[k] > 0; })
-      .map(function (k) { return { sku: k, qty: cart[k] }; });
+    var items = Object.keys(cart).map(function (k) {
+      return { sku: cart[k].sku, qty: cart[k].qty, opts: cart[k].opts || [] };
+    });
     if (!items.length) return;
     send({ t: "order", id: C.newId(), table: me.table || "?", by: me.name || "guest",
            note: $("note").value.trim(), items: items, ts: Date.now() });
@@ -558,6 +534,63 @@
     printDocket((kind === "bill" ? "BILL · " : "KOT · ") + t("table") + " " + o.table,
       lines, (o.by || "") + (o.note ? " · " + o.note : ""));
   }
+  /* The same shift, on A4, for the accounts: figures, what sold, what each table
+   * ran up, and what is nearly gone. */
+  function buildA4() {
+    var r = C.report(doc);
+    var totals = C.tableTotals(doc);
+    var tiles = C.floorPlan(doc, Date.now());
+    function fig(label, value) { return '<div class="fig"><b>' + esc(value) + "</b><span>" + esc(label) + "</span></div>"; }
+    var html = '<div class="a4"><h1>' + esc(t("sheet")) + "</h1>" +
+      '<div class="meta">' + esc(roomName()) + " · " + esc(stamp()) + "</div>" +
+      '<div class="figs">' + fig(t("covers"), r.covers) + fig(t("revenue"), C.money(r.revenue)) +
+      fig(t("average"), C.money(r.average)) + fig(t("cancelled"), r.cancelled) +
+      fig(t("tables"), r.tables) + "</div>";
+
+    html += "<h2>" + esc(t("topItems")) + '</h2><table><tr><th>Item</th><th class="n">Qty</th><th class="n">Value</th></tr>';
+    if (!r.top.length) html += '<tr><td colspan="3">' + esc(t("empty")) + "</td></tr>";
+    r.top.forEach(function (x) {
+      html += "<tr><td>" + esc(x.name) + '</td><td class="n">' + x.qty + '</td><td class="n">' + C.money(x.revenue) + "</td></tr>";
+    });
+    html += "</table>";
+
+    html += "<h2>Tables</h2><table><tr><th>" + esc(t("table")) + '</th><th class="n">' + esc(t("orders")) +
+      '</th><th class="n">' + esc(t("total")) + "</th></tr>";
+    if (!tiles.length) html += '<tr><td colspan="3">' + esc(t("empty")) + "</td></tr>";
+    tiles.forEach(function (tl) {
+      html += "<tr><td>" + esc(tl.table) + '</td><td class="n">' + tl.orders + '</td><td class="n">' +
+        C.money(totals[tl.table] || 0) + "</td></tr>";
+    });
+    html += "</table>";
+
+    if (r.lowStock.length) {
+      html += "<h2>" + esc(t("lowStock")) + '</h2><table><tr><th>Item</th><th class="n">Left</th></tr>';
+      r.lowStock.forEach(function (x) {
+        html += "<tr><td>" + esc(x.name) + '</td><td class="n">' + x.stock + "</td></tr>";
+      });
+      html += "</table>";
+    }
+    html += "</div>";
+    $("printArea").innerHTML = html;
+    return html;
+  }
+
+  function printA4() { buildA4(); window.print(); }
+
+  /* dd/mm/yyyy hh:mm — the room is in India, and an A4 sheet is read on paper */
+  function stamp() {
+    var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear() + " " +
+      p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+
+  /* A name for the sheet: the room, if we know it, else the table's own board. */
+  function roomName() {
+    if (status === "solo") return "Solo board";
+    if (me.host) return me.host.replace(/^https?:\/\//, "");
+    return location.host || "Canteen";
+  }
+
   function printReport() {
     var r = C.report(doc);
     var lines = [[t("covers"), String(r.covers)], [t("revenue"), C.money(r.revenue)],
@@ -590,6 +623,10 @@
     $("miPrice").value = item ? (item.price / 100) : "";
     $("miSku").value = item ? item.sku : "";
     $("miStock").value = item && item.stock != null ? item.stock : "";
+    $("miFrom").value = item && item.window && item.window.from != null ? item.window.from : "";
+    $("miTo").value = item && item.window && item.window.to != null ? item.window.to : "";
+    $("miOpts").value = item && (item.options || []).length
+      ? item.options.map(function (o) { return o.name + ":" + (o.price / 100); }).join(", ") : "";
     var tags = item ? (item.tags || []) : [];
     var box = $("miTags");
     box.innerHTML = "";
@@ -604,6 +641,30 @@
     $("miMsg").textContent = item ? item.sku : "";
   }
 
+  /* "Extra chutney:10, No sugar:0" -> [{code, name, price}] in paise */
+  function parseOptions(text) {
+    return String(text || "").split(",").map(function (part) {
+      part = part.trim();
+      if (!part) return null;
+      var bits = part.split(":");
+      var name = (bits[0] || "").trim();
+      var rupees = parseFloat(bits[1]);
+      if (!name) return null;
+      return {
+        code: slug(name), name: name,
+        price: isFinite(rupees) && rupees > 0 ? Math.round(rupees * 100) : 0
+      };
+    }).filter(Boolean);
+  }
+
+  function windowLabel(w) {
+    function hh(n) { return (n < 10 ? "0" : "") + n + ":00"; }
+    if (!w) return "";
+    if (w.from == null) return "until " + hh(w.to);
+    if (w.to == null) return "from " + hh(w.from);
+    return hh(w.from) + "–" + hh(w.to);
+  }
+
   function saveItem() {
     var name = $("miName").value.trim();
     var rupees = parseFloat($("miPrice").value);
@@ -616,7 +677,9 @@
     send({ t: "menu:set", by: me.name, item: {
       sku: sku, name: name, price: Math.round(rupees * 100), tags: tags,
       names: existing ? existing.names : {}, soldOut: existing ? existing.soldOut : false,
-      stock: C.normStock($("miStock").value)
+      stock: C.normStock($("miStock").value),
+      from: C.normHour($("miFrom").value), to: C.normHour($("miTo").value),
+      options: parseOptions($("miOpts").value)
     } });
     fillItemForm(null);
     $("miMsg").textContent = t("menu") + ": " + name;
@@ -635,25 +698,57 @@
     if (!joined) return;
 
     /* ---- guest: menu, cart, my table ---- */
-    var list = C.searchMenu(doc, $("search").value, { tag: filter });
+    var hour = new Date().getHours();
+    var list = C.searchMenu(doc, $("search").value, { tag: filter, hour: hour });
     var mEl = $("menu"); mEl.innerHTML = "";
+    /* items off the menu because of the clock are counted, not silently missing */
+    var offHours = doc.menu.filter(function (m) { return C.isAvailable(m) && !C.servesAt(m, hour); }).length;
+    if (offHours) {
+      $("offHours").hidden = false;
+      $("offHours").textContent = offHours + (offHours === 1 ? " dish is" : " dishes are") +
+        " off the menu at this hour.";
+    } else { $("offHours").hidden = true; }
     if (!list.length) mEl.innerHTML = '<div class="card empty">' + t("empty") + "</div>";
     list.forEach(function (it) {
-      var q = cart[it.sku] || 0;
+      var picked = (picks[it.sku] || []).filter(function (code) {
+        return (it.options || []).some(function (o) { return o.code === code; });
+      });
+      var key = C.lineKey(it.sku, picked);
+      var q = cart[key] ? cart[key].qty : 0;
       var off = !C.isAvailable(it);
       var card = document.createElement("div");
       card.className = "card" + (off ? " sold" : "");
       var tagHtml = (it.tags || []).map(function (x) { return '<span class="tag">' + esc(x) + "</span>"; }).join("");
       if (it.stock != null) tagHtml += '<span class="tag' + (it.stock <= 3 ? " on" : "") + '">' +
         (it.stock > 0 ? it.stock + " " + t("left") : t("soldOutShort")) + "</span>";
-      card.innerHTML = '<div class="item"><div><b>' + esc(C.menuItemName(it, L.i18n.lang)) + "</b><br><small>" +
+      if (it.window) tagHtml += '<span class="tag">' + windowLabel(it.window) + "</span>";
+      var optHtml = (it.options || []).length ? '<div class="opts">' + it.options.map(function (o) {
+        return '<button type="button" class="opt' + (picked.indexOf(o.code) >= 0 ? " on" : "") +
+          '" data-opt="' + esc(o.code) + '">' + esc(o.name) +
+          (o.price ? " +" + C.money(o.price) : "") + "</button>";
+      }).join("") + "</div>" : "";
+      card.innerHTML = '<div class="item"><div><b>' + esc(it.name) + "</b><br><small>" +
         C.money(it.price) + "</small><br>" + tagHtml + "</div>" +
         (off ? '<span class="tag">' + t("soldOutShort") + "</span>" :
           '<div class="qty"><button data-m="-1" aria-label="−">&minus;</button><span>' + q +
-          '</span><button data-m="1" aria-label="+">+</button></div>') + "</div>";
-      card.querySelectorAll("button").forEach(function (b) {
+          '</span><button data-m="1" aria-label="+">+</button></div>') + "</div>" + optHtml;
+      card.querySelectorAll("[data-opt]").forEach(function (b) {
         b.addEventListener("click", function () {
-          cart[it.sku] = Math.max(0, Math.min(C.MAX_QTY, (cart[it.sku] || 0) + parseInt(b.getAttribute("data-m"), 10)));
+          var code = b.getAttribute("data-opt");
+          var now = (picks[it.sku] || []).slice();
+          var at = now.indexOf(code);
+          if (at >= 0) now.splice(at, 1); else now.push(code);
+          picks[it.sku] = now;
+          render();
+        });
+      });
+      card.querySelectorAll("[data-m]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var step = parseInt(b.getAttribute("data-m"), 10);
+          var line = cart[key] || { sku: it.sku, qty: 0, opts: picked.slice() };
+          line.qty = Math.max(0, Math.min(C.MAX_QTY, line.qty + step));
+          line.opts = picked.slice();
+          if (line.qty > 0) cart[key] = line; else delete cart[key];
           L.storage.set("canteen:cart", cart);
           render();
         });
@@ -662,17 +757,21 @@
     });
 
     var cEl = $("cart"); cEl.innerHTML = "";
-    var lines = Object.keys(cart).filter(function (k) { return cart[k] > 0; });
+    var lines = Object.keys(cart).filter(function (k) { return cart[k] && cart[k].qty > 0; });
     if (!lines.length) { cEl.innerHTML = '<div class="empty">' + t("empty") + "</div>"; }
     else {
       var total = 0;
       lines.forEach(function (k) {
-        var it = C.menuItem(doc, k); if (!it) return;
-        total += it.price * cart[k];
-        cEl.insertAdjacentHTML("beforeend", '<div class="line"><span>' + esc(C.menuItemName(it, L.i18n.lang)) +
-          " &times; " + cart[k] + "</span><span>" + C.money(it.price * cart[k]) + "</span></div>");
+        var line = cart[k];
+        var it = C.menuItem(doc, line.sku); if (!it) return;
+        var chosen = C.resolveOptions(it, line.opts);
+        var each = it.price + C.addOf(chosen);
+        total += each * line.qty;
+        var extra = chosen.length ? " · " + chosen.map(function (o) { return o.name; }).join(", ") : "";
+        cEl.insertAdjacentHTML("beforeend", '<div class="line"><span>' + esc(it.name) + extra +
+          " &times; " + line.qty + "</span><span>" + C.money(each * line.qty) + "</span></div>");
       });
-      cEl.insertAdjacentHTML("beforeend", '<div class="line"><b>' + t("total") + "</b><b>" + C.money(total) + "</b></div>");
+      cEl.insertAdjacentHTML("beforeend", '<div class="line"><b>' + t("total") + '</b><b>' + C.money(total) + "</b></div>");
     }
 
     var mine = C.ordersForTable(doc, me.table || "?");
@@ -824,7 +923,9 @@
       row.innerHTML = "<div><b>" + esc(m.name) + '</b> <span class="mut">' + esc(m.sku) + "</span><br>" +
         '<small class="mut">' + C.money(m.price) + " · " +
         (m.tags || []).join(" ") + (m.soldOut ? " · " + t("soldOut") : "") +
-        (m.stock != null ? " · " + m.stock + " " + t("left") : "") + "</small></div>";
+        (m.stock != null ? " · " + m.stock + " " + t("left") : "") +
+        (m.window ? " · " + windowLabel(m.window) : "") +
+        ((m.options || []).length ? " · " + m.options.length + " " + t("opts").toLowerCase() : "") + "</small></div>";
       var acts = document.createElement("div");
       acts.className = "acts";
       var bSold = document.createElement("button");
@@ -864,7 +965,10 @@
 
   function orderCard(o, actions) {
     var card = document.createElement("div"); card.className = "order";
-    var lines = o.items.map(function (l) { return l.qty + "× " + esc(l.name); }).join("<br>");
+    var lines = o.items.map(function (l) {
+      return l.qty + "× " + esc(l.name) + (l.opts && l.opts.length
+        ? ' <span class="mut">· ' + l.opts.map(function (x) { return esc(x.name); }).join(", ") + "</span>" : "");
+    }).join("<br>");
     var age = C.ageMinutes(o, Date.now());
     card.innerHTML = '<div class="top"><b>' + t("table") + " " + esc(o.table) + " · " + esc(o.by) + "</b>" +
       statusPill(o.status) + "</div>" +
@@ -895,6 +999,7 @@
 
   fillItemForm(null);
   paintStatus(); label(); render();
+  if (sheetOnly) buildA4();
 })();
 </script>
 
@@ -933,6 +1038,20 @@ window.addEventListener("error", function () { window.__bootError = true; });
   .card,[class*="card"]{border-radius:20px !important}
   button.primary{background:var(--acc) !important}
   #printArea{display:none}
+  /* the A4 sheet the accounts get: a page, not a docket */
+  #printArea .a4{font:12px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#000}
+  #printArea .a4 h1{font-size:19px;margin:0 0 2px;letter-spacing:-.01em}
+  #printArea .a4 .meta{color:#555;font-size:11.5px;margin-bottom:12px}
+  #printArea .a4 .figs{display:flex;flex-wrap:wrap;gap:22px;margin:12px 0 4px}
+  #printArea .a4 .fig b{display:block;font-size:19px;line-height:1.1}
+  #printArea .a4 .fig span{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#555}
+  #printArea .a4 h2{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#555;margin:16px 0 4px}
+  #printArea .a4 table{width:100%;border-collapse:collapse}
+  #printArea .a4 th{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#555;
+       text-align:left;border-bottom:1px solid #999;padding:4px 6px}
+  #printArea .a4 td{border-bottom:1px solid #ddd;padding:4px 6px;font-size:12px}
+  #printArea .a4 td.n,#printArea .a4 th.n{text-align:right;font-variant-numeric:tabular-nums}
+  @page{size:A4;margin:16mm}
   @media print{
     body>*:not(#printArea){display:none !important}
     #printArea{display:block !important}

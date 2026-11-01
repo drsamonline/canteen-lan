@@ -23,7 +23,7 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var VERSION = "1.3.0";
+  var VERSION = "1.4.0";
 
   var MAX_ORDERS = 5000;
   var MAX_ITEMS_PER_ORDER = 50;
@@ -33,6 +33,7 @@
   var MAX_CALLS = 500;
   var MAX_LOG = 500;
   var MAX_STOCK = 9999;
+  var MAX_OPTIONS = 6;
   var SKU = /^[a-z0-9][a-z0-9-]{0,23}$/;
   var STATUSES = { placed: 1, preparing: 1, served: 1, cancelled: 1 };
   var CALL_KINDS = { waiter: 1, bill: 1 };
@@ -87,6 +88,48 @@
     return CALL_KINDS[k] ? k : "";
   }
 
+  /* A priced modifier: "extra chutney, ₹10". Codes are short and stable; the name
+   * and price are snapshotted onto the order so a later edit cannot rewrite a
+   * bill that was already placed. */
+  function normOption(o) {
+    if (!o || typeof o !== "object") return null;
+    var code = normSku(o.code);
+    if (!code) return null;
+    return { code: code, name: normName(o.name, 32) || code, price: normPrice(o.price) };
+  }
+
+  function normOptions(list) {
+    var out = [], seen = {};
+    (Array.isArray(list) ? list : []).forEach(function (o) {
+      var x = normOption(o);
+      if (x && !seen[x.code] && out.length < MAX_OPTIONS) { seen[x.code] = 1; out.push(x); }
+    });
+    return out;
+  }
+
+  /* A dish can belong to part of the day: breakfast until eleven, lunch after.
+   * Hours are 0–23, and a window may wrap past midnight (22 → 4). */
+  function normHour(h) {
+    if (h === null || h === undefined || h === "") return null;
+    var n = Number(h);
+    if (!isNum(n)) return null;
+    n = Math.floor(n);
+    if (n < 0 || n > 23) return null;
+    return n;
+  }
+
+  function servesAt(item, hour) {
+    if (!item || !item.window) return true;
+    if (!isNum(hour)) return true;
+    var from = item.window.from, to = item.window.to;
+    if (from == null && to == null) return true;
+    hour = ((Math.floor(hour) % 24) + 24) % 24;
+    if (from == null) return hour < to;
+    if (to == null) return hour >= from;
+    if (from <= to) return hour >= from && hour < to;
+    return hour >= from || hour < to;          /* wraps midnight */
+  }
+
   function normTags(t) {
     var out = [];
     (Array.isArray(t) ? t : String(t == null ? "" : t).split(",")).forEach(function (x) {
@@ -123,14 +166,17 @@
 
   function defaultMenu() {
     return [
-      { sku: "chai", name: "Masala chai", price: 1500, names: { hi: "मसाला चाय", gu: "મસાલા ચા" }, tags: ["veg", "dairy"] },
+      { sku: "chai", name: "Masala chai", price: 1500, names: { hi: "मसाला चाय", gu: "મસાલા ચા" }, tags: ["veg", "dairy"],
+        options: [{ code: "elaichi", name: "Elaichi", price: 500 }, { code: "sugar", name: "Extra sugar", price: 0 }] },
       { sku: "coffee", name: "Filter coffee", price: 2000, names: { hi: "फ़िल्टर कॉफ़ी", gu: "ફિલ્ટર કોફી" }, tags: ["veg", "dairy"] },
       { sku: "samosa", name: "Samosa (2 pcs)", price: 3000, names: { hi: "समोसा (2 नग)", gu: "સમોસા (2 નંગ)" }, tags: ["veg", "fried"] },
       { sku: "vada", name: "Medu vada (2 pcs)", price: 2500, names: { hi: "मेदु वड़ा (2 नग)", gu: "મેદુ વડા (2 નંગ)" }, tags: ["veg", "fried"] },
       { sku: "idli", name: "Idli (2 pcs)", price: 3000, names: { hi: "इडली (2 नग)", gu: "ઇડલી (2 નંગ)" }, tags: ["veg"] },
       { sku: "dosa", name: "Masala dosa", price: 6000, names: { hi: "मसाला डोसा", gu: "મસાલા ડોસા" }, tags: ["veg", "spicy"] },
-      { sku: "poha", name: "Poha", price: 3500, names: { hi: "पोहा", gu: "પોહા" }, tags: ["veg"] },
-      { sku: "thali", name: "Veg thali", price: 12000, names: { hi: "वेज थाली", gu: "વેજ થાળી" }, tags: ["veg", "dairy"] },
+      { sku: "poha", name: "Poha", price: 3500, names: { hi: "पोहा", gu: "પોહા" }, tags: ["veg"],
+        from: 6, to: 11 },
+      { sku: "thali", name: "Veg thali", price: 12000, names: { hi: "वेज थाली", gu: "વેજ થાળી" }, tags: ["veg", "dairy"],
+        from: 12, to: 16 },
       { sku: "lime", name: "Lime soda", price: 3000, names: { hi: "नींबू सोडा", gu: "લીંબુ સોડા" }, tags: ["veg"] },
       { sku: "water", name: "Bottled water", price: 2000, names: { hi: "पानी की बोतल", gu: "પાણીની બોટલ" }, tags: [] }
     ];
@@ -147,7 +193,12 @@
       names: normNames(m.names),
       tags: normTags(m.tags),
       soldOut: m.soldOut === true || m.soldOut === 1 || m.soldOut === "true",
-      stock: normStock(m.stock)
+      stock: normStock(m.stock),
+      options: normOptions(m.options),
+      window: (function () {
+        var f = normHour(m.from), t = normHour(m.to);
+        return f == null && t == null ? null : { from: f, to: t };
+      })()
     };
   }
 
@@ -240,8 +291,8 @@
     return item.stock == null || item.stock > 0;
   }
 
-  function availableMenu(doc) {
-    return ((doc && doc.menu) || []).filter(isAvailable);
+  function availableMenu(doc, hour) {
+    return ((doc && doc.menu) || []).filter(function (m) { return isAvailable(m) && servesAt(m, hour); });
   }
 
   function remainingStock(doc, sku) {
@@ -266,6 +317,7 @@
     var q = String(query == null ? "" : query).trim().toLowerCase();
     return ((doc && doc.menu) || []).filter(function (m) {
       if (opts.hideSoldOut && !isAvailable(m)) return false;
+      if (!servesAt(m, opts.hour)) return false;
       if (opts.tag && (m.tags || []).indexOf(opts.tag) < 0) return false;
       if (!q) return true;
       var hay = [m.sku, m.name].concat(Object.keys(m.names || {}).map(function (k) { return m.names[k]; }))
@@ -288,18 +340,53 @@
       /* a counted item can only be ordered as far as the count goes */
       var cap = m.stock == null ? MAX_QTY : Math.min(MAX_QTY, m.stock);
       if (cap < 1) return;
+      /* options are picked from the dish's own list, never sent as a price */
+      var chosen = resolveOptions(m, line.opts);
+      var key = lineKey(sku, chosen);
       var existing = null;
-      for (var i = 0; i < out.length; i++) if (out[i].sku === sku) existing = out[i];
+      for (var i = 0; i < out.length; i++) if (lineKey(out[i].sku, out[i].opts) === key) existing = out[i];
       if (existing) existing.qty = Math.min(cap, existing.qty + qty);
-      else out.push({ sku: sku, name: m.name, price: m.price, qty: Math.min(cap, qty) });
+      else out.push({ sku: sku, name: m.name, price: m.price, qty: Math.min(cap, qty), opts: chosen, add: addOf(chosen) });
       if (out.length > MAX_ITEMS_PER_ORDER) out.length = MAX_ITEMS_PER_ORDER;
     });
     return out;
   }
 
+  /* The modifiers a guest asked for, validated against the dish's own list and
+   * snapshotted with their names and prices. */
+  function resolveOptions(item, wanted) {
+    var out = [];
+    if (!item || !Array.isArray(item.options) || !Array.isArray(wanted)) return out;
+    wanted.forEach(function (w) {
+      var code = normSku(typeof w === "string" ? w : (w && w.code));
+      if (!code) return;
+      for (var i = 0; i < item.options.length; i++) {
+        if (item.options[i].code === code && out.length < MAX_OPTIONS) {
+          out.push({ code: code, name: item.options[i].name, price: item.options[i].price });
+          return;
+        }
+      }
+    });
+    return out;
+  }
+
+  function addOf(opts) {
+    return (Array.isArray(opts) ? opts : []).reduce(function (n, o) { return n + normPrice(o.price); }, 0);
+  }
+
+  /* Two lines of the same dish are the same line only if the modifiers match. */
+  function lineKey(sku, opts) {
+    var codes = (Array.isArray(opts) ? opts : []).map(function (o) { return normSku(o.code); }).sort();
+    return normSku(sku) + (codes.length ? "+" + codes.join("+") : "");
+  }
+
+  function lineTotal(line) {
+    return (normPrice(line.price) + addOf(line.opts)) * normQty(line.qty);
+  }
+
   function totalOf(order) {
     var items = (order && order.items) || [], sum = 0;
-    items.forEach(function (l) { sum += normPrice(l.price) * normQty(l.qty); });
+    items.forEach(function (l) { sum += lineTotal(l); });
     return sum;
   }
 
@@ -313,7 +400,10 @@
       status: "placed",
       ts: isNum(opts.ts) ? opts.ts : 0,
       items: (opts.items || []).map(function (l) {
-        return { sku: normSku(l.sku), name: normName(l.name, 40), price: normPrice(l.price), qty: normQty(l.qty) };
+        var line = { sku: normSku(l.sku), name: normName(l.name, 40), price: normPrice(l.price), qty: normQty(l.qty) };
+        var chosen = normOptions(l.opts);
+        if (chosen.length) { line.opts = chosen; line.add = addOf(chosen); }
+        return line;
       }).filter(function (l) { return l.sku && l.qty > 0; })
     };
   }
@@ -441,8 +531,12 @@
     var lines = [], by = {}, total = 0;
     orders.forEach(function (o) {
       o.items.forEach(function (l) {
-        var k = l.sku;
-        if (!by[k]) { by[k] = { sku: k, name: l.name, price: normPrice(l.price), qty: 0 }; lines.push(by[k]); }
+        var k = lineKey(l.sku, l.opts);
+        if (!by[k]) {
+          by[k] = { sku: l.sku, name: l.name, price: normPrice(l.price), qty: 0,
+                    opts: (l.opts || []).slice(), add: addOf(l.opts) };
+          lines.push(by[k]);
+        }
         by[k].qty += normQty(l.qty);
       });
       total += totalOf(o);
@@ -610,7 +704,7 @@
         var k = l.sku;
         if (!by[k]) by[k] = { sku: k, name: l.name, qty: 0, revenue: 0 };
         by[k].qty += l.qty;
-        by[k].revenue += normPrice(l.price) * normQty(l.qty);
+        by[k].revenue += lineTotal(l);
       });
     });
     var top = Object.keys(by).map(function (k) { return by[k]; })
@@ -641,7 +735,10 @@
         id: o.id, table: normTable(o.table), by: normName(o.by, 24), note: normName(o.note, 80),
         status: normStatus(o.status), ts: isNum(o.ts) ? o.ts : 0,
         items: (o.items || []).map(function (l) {
-          return { sku: normSku(l.sku), name: normName(l.name, 40), price: normPrice(l.price), qty: normQty(l.qty) };
+          var line = { sku: normSku(l.sku), name: normName(l.name, 40), price: normPrice(l.price), qty: normQty(l.qty) };
+          var chosen = normOptions(l.opts);
+          if (chosen.length) { line.opts = chosen; line.add = addOf(chosen); }
+          return line;
         })
       });
     });
@@ -686,7 +783,10 @@
       table: normTable(order && order.table),
       by: normName(order && order.by, 24),
       status: normStatus(order && order.status),
-      items: (order && order.items || []).map(function (l) { return l.qty + "x " + l.name; }).join("; "),
+      items: (order && order.items || []).map(function (l) {
+        return l.qty + "x " + l.name + (l.opts && l.opts.length
+          ? " (" + l.opts.map(function (o) { return o.name; }).join(", ") + ")" : "");
+      }).join("; "),
       total: money(totalOf(order))
     };
   }
@@ -716,6 +816,14 @@
     normKind: normKind,
     normTags: normTags,
     normStock: normStock,
+    normOption: normOption,
+    normOptions: normOptions,
+    normHour: normHour,
+    servesAt: servesAt,
+    resolveOptions: resolveOptions,
+    addOf: addOf,
+    lineKey: lineKey,
+    lineTotal: lineTotal,
     normNames: normNames,
     normMenu: normMenu,
     normMenuItem: normMenuItem,
