@@ -1375,5 +1375,26 @@ window.addEventListener("error", function () { window.__bootError = true; });
     #printArea{display:block !important}
   }
 </style>
+<script>
+  /* A first-time visitor is asked for a host address they do not have yet, with
+     "Join room" as the loud button and the one path that works alone as a small
+     ghost beside it. When there is no saved host, the solo path is the honest
+     primary action, and it says so. */
+  (function () {
+    var host = document.getElementById("host");
+    var solo = document.getElementById("soloBtn");
+    var join = document.getElementById("joinBtn");
+    if (!host || !solo || !join) return;
+    var saved = String(host.value || "").trim();
+    if (saved) return;                      /* they know where their host is */
+    solo.className = "primary";
+    join.className = "ghost sm";
+    var hint = document.getElementById("joinHint");
+    if (hint) {
+      hint.textContent = "No host on your Wi-Fi yet? Use \u201cThis device only\u201d \u2014 " +
+        "the whole canteen runs on this phone or laptop, and nothing leaves it.";
+    }
+  })();
+</script>
 </body>
 </html>
