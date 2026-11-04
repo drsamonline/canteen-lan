@@ -17,6 +17,16 @@ function ok(name, cond, extra) {
   else { fail++; console.log("  FAIL " + name + (extra ? "  (" + extra + ")" : "")); }
 }
 
+/* An external *resource* is something the page loads — a script, a stylesheet, an
+ * image, a frame, a CSS url(). A plain <a href> is a link the reader may follow.
+ * The support block and the hub link are deliberately external anchors, and the
+ * app still has to work with the network off, so the rule is about loads only. */
+function externalResource(html) {
+  var loaded = /<(?:script|img|iframe|source|video|audio|embed|link)\b[^>]*?\b(?:src|href)\s*=\s*["']\s*(?:https?:)?\/\//i;
+  var inCss = /url\(\s*["']?\s*(?:https?:)?\/\//i;
+  return loaded.test(html) || inCss.test(html);
+}
+
 console.log("Canteen engine " + C.version + " — tests");
 
 /* ---- 1. a fresh board ---- */
@@ -238,7 +248,7 @@ console.log("Canteen engine " + C.version + " — tests");
     ok("script present: " + s, !/^(https?:)?\/\//.test(s) && fs.existsSync(path.join(play, s)));
   });
   ok("web-kit is shipped locally", srcs.indexOf("web-kit.js") !== -1);
-  ok("no external asset in the app page", !/(src|href)="https?:\/\//.test(html));
+  ok("no external asset in the app page", !externalResource(html));
   var webkit = fs.readFileSync(path.join(play, "web-kit.js"), "utf8");
   ["storage", "i18n", "csv", "theme", "seo", "ui"].forEach(function (k) {
     ok("web-kit exposes " + k, new RegExp("Loom\\." + k + "\\s*=").test(webkit));
@@ -412,7 +422,7 @@ console.log("Canteen engine " + C.version + " — tests");
   ok("the cache name carries the release", /canteen-\d+\.\d+\.\d+/.test(sw));
   var man = JSON.parse(fs.readFileSync(path.join(play, "manifest.webmanifest"), "utf8"));
   ok("the manifest starts in the app", man.start_url === "./" && man.icons.length >= 2);
-  ok("no external asset in the app page", !/(src|href)="https?:\/\//.test(html));
+  ok("no external asset in the app page", !externalResource(html));
 })();
 
 /* ---- 25. stock: a count, not a flag ---- */
