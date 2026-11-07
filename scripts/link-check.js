@@ -24,8 +24,19 @@ function ok(name, cond, extra) {
   else { fail++; console.log("  FAIL " + name + (extra ? "  (" + extra + ")" : "")); }
 }
 
-function isRemote(u) { return /^(https?:)?\/\//i.test(u) || /^(mailto:|tel:)/i.test(u); }
+/* any scheme — https:, mailto:, tel:, upi: — is a link to somewhere else, not a
+ * path on disk. upi: is how the support block takes a payment; it is not a file. */
+function isRemote(u) { return /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(u); }
 function isAnchor(u) { return u.charAt(0) === "#"; }
+
+/* An external *resource* is something the page loads. A plain <a href> is a link
+ * the reader may follow: the support block is deliberately external anchors, and
+ * the app still has to run with the network off, so the rule is about loads only. */
+function externalResource(html) {
+  const loaded = /<(?:script|img|iframe|source|video|audio|embed|link)\b[^>]*?\b(?:src|href)\s*=\s*["']\s*(?:https?:)?\/\//i;
+  const inCss = /url\(\s*["']?\s*(?:https?:)?\/\//i;
+  return loaded.test(html) || inCss.test(html);
+}
 
 /* every id="..." in a document, so anchors can be checked */
 function idsIn(html) {
@@ -100,7 +111,7 @@ const app = fs.readFileSync(play, "utf8");
 ["qr.js", "canteen.js", "lan-kit.js", "web-kit.js", "sw.js", "manifest.webmanifest"].forEach(function (f) {
   ok("docs/play/ ships " + f, fs.existsSync(path.join(ROOT, "docs", "play", f)));
 });
-ok("the app references no remote asset", !/(src|href)="https?:\/\//.test(app));
+ok("the app references no remote asset", !externalResource(app));
 
 /* remote URLs: listed, not fetched — this repo has no network in CI by design */
 const uniq = Array.from(new Set(remote)).sort();
