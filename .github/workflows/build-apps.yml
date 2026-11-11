@@ -56,7 +56,7 @@ jobs:
 
   app:
     needs: test
-    uses: drsamonline/app-builder/.github/workflows/build.yml@49c2e0b   # was @main
+    uses: drsamonline/app-builder/.github/workflows/build.yml@49c2e0b172890f9334bbc7167a0e7fb5cd3756ba   # was @main
     with:
       app_name: canteen-lan
       app_src: docs/play
