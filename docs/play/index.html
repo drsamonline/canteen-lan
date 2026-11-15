@@ -92,6 +92,11 @@
   .slipbody{min-width:0}
   .slipbody small{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;word-break:break-all}
 </style>
+<style>
+/* ---- a11y: the rule each label needs, chosen against its measured surface -- */
+[data-theme="light"] button.primary{color:#ffffff!important}   /* 3.39 -> 5.03:1 on rgb(192,72,10) */
+[data-theme="dark"] code{color:#0b1020!important}   /* 1.18 -> 18.62:1 on rgb(255,253,248) */
+</style>
 </head>
 <body>
 <header>
